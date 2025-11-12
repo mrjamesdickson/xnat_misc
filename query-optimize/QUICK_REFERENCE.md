@@ -4,17 +4,17 @@
 
 ### Option 1: Just Create Indexes (5 minutes, safe)
 ```bash
-psql -U xnat -d xnat -f recommended-indexes.sql
+psql -U xnat -d xnat -f scripts/recommended-indexes.sql
 ```
 **Result:** 3-4x faster queries (1500ms → 400ms)
 
 ### Option 2: Full Optimization (10 minutes)
 ```bash
 # 1. Create indexes
-psql -U xnat -d xnat -f recommended-indexes.sql
+psql -U xnat -d xnat -f scripts/recommended-indexes.sql
 
 # 2. Test performance
-psql -U xnat -d xnat -f performance-test.sql
+psql -U xnat -d xnat -f scripts/performance-test.sql
 ```
 **Result:** Verify 3-4x improvement + get baseline for query rewrite
 
@@ -27,10 +27,10 @@ psql -U xnat -d xnat -f performance-test.sql
 | **EXECUTIVE_SUMMARY.md** | Business case, ROI, implementation plan | Show to management |
 | **README.md** | Technical documentation and best practices | Detailed implementation guide |
 | **QUICK_REFERENCE.md** | This file - quick commands | Fast lookup |
-| **recommended-indexes.sql** | Creates 6 database indexes | Run immediately (low risk) |
-| **workflow-query-optimized.sql** | Improved SQL query | Use in code rewrite (Phase 2) |
-| **schema-wrk_workflowdata.sql** | Current table structure | Reference for understanding |
-| **performance-test.sql** | Before/after benchmarks | Verify improvements |
+| **scripts/recommended-indexes.sql** | Creates 6 database indexes | Run immediately (low risk) |
+| **scripts/workflow-query-optimized.sql** | Improved SQL query | Use in code rewrite (Phase 2) |
+| **scripts/schema-wrk_workflowdata.sql** | Current table structure | Reference for understanding |
+| **scripts/performance-test.sql** | Before/after benchmarks | Verify improvements |
 
 ---
 

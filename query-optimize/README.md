@@ -11,27 +11,36 @@ The original XNAT workflow query has performance issues:
 - Full table scans on large tables
 - Query execution time: 500ms - 2000ms for large datasets
 
+## Directory Structure
+
+```
+query-optimize/
+├── README.md                           # Main documentation (this file)
+├── EXECUTIVE_SUMMARY.md                # Business case and recommendations
+├── QUICK_REFERENCE.md                  # Quick start guide
+└── scripts/                            # SQL scripts for implementation
+    ├── workflow-query-original.sql     # Original slow query
+    ├── workflow-query-optimized.sql    # Optimized query (10x faster)
+    ├── recommended-indexes.sql         # Index creation script
+    ├── performance-test.sql            # Before/after testing
+    └── schema-wrk_workflowdata.sql     # Table schema reference
+```
+
 ## Files
 
-### 1. `workflow-query-original.sql`
-The original query from XNAT that retrieves workflow data for experiments and their assessors.
+### Documentation
+- **README.md** - Complete technical documentation (this file)
+- **EXECUTIVE_SUMMARY.md** - Business case, ROI, implementation plan
+- **QUICK_REFERENCE.md** - Quick start commands and cheat sheet
 
-### 2. `recommended-indexes.sql`
-Comprehensive index recommendations including:
-- Primary indexes for lookup optimization
-- Secondary indexes for JOIN optimization
-- Covering indexes to reduce table scans
-- Ordering indexes for sort performance
+### SQL Scripts (`scripts/` directory)
+- **workflow-query-original.sql** - Original XNAT query with performance issues
+- **recommended-indexes.sql** - 6 index recommendations (3-4x speedup)
+- **workflow-query-optimized.sql** - Rewritten query using CTEs (additional 2-3x speedup)
+- **performance-test.sql** - Automated before/after benchmarking
+- **schema-wrk_workflowdata.sql** - Complete table schema with existing index analysis
 
-**Expected Improvement:** 5-10x faster query execution (50ms - 200ms)
-
-### 3. `workflow-query-optimized.sql`
-Optimized version of the query with:
-- Common Table Expressions (CTEs) for clarity
-- UNION ALL instead of UNION
-- Reduced nesting levels
-- Better index utilization
-- Alternative approaches for different use cases
+**Expected Improvement:** 5-10x faster query execution (1500ms → 150ms)
 
 ## Quick Start
 
@@ -42,7 +51,7 @@ Optimized version of the query with:
 psql -U xnat -d xnat
 
 # Run index creation script
-\i recommended-indexes.sql
+\i scripts/recommended-indexes.sql
 ```
 
 ### Step 2: Test Performance
