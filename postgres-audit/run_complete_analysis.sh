@@ -5,6 +5,27 @@
 
 set -e  # Exit on error
 
+# Colors for better readability
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+BOLD='\033[1m'
+
+# Progress bar function
+show_progress() {
+    local current=$1
+    local total=$2
+    local width=50
+    local percentage=$((current * 100 / total))
+    local completed=$((width * current / total))
+
+    printf "\r${BLUE}Progress: ${NC}["
+    printf "%${completed}s" | tr ' ' '▓'
+    printf "%$((width - completed))s" | tr ' ' '░'
+    printf "] ${BOLD}%3d%%${NC} (Step %d/%d)" $percentage $current $total
+}
+
 # Configuration
 DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H-%M-%S)
@@ -13,44 +34,91 @@ DB_HOST="localhost"
 DB_USER="postgres"
 DB_NAME="xnat"
 DOCKER_CONTAINER="xnat-db"
+TOTAL_STEPS=9
 
-echo "========================================="
-echo "PostgreSQL Complete Index Analysis"
-echo "========================================="
-echo "Date: $DATE"
-echo "Time: $TIME"
-echo "Results will be saved to: $RESULTS_DIR"
+echo ""
+echo "${BOLD}=========================================${NC}"
+echo "${BOLD}PostgreSQL Complete Index Analysis${NC}"
+echo "${BOLD}=========================================${NC}"
+echo "${GREEN}Date:${NC} $DATE"
+echo "${GREEN}Time:${NC} $TIME"
+echo "${GREEN}Results:${NC} $RESULTS_DIR"
+echo "${BOLD}=========================================${NC}"
 echo ""
 
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
-echo "Step 1: Running database audit..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/01_database_audit.sql > "$RESULTS_DIR/01_audit_report.txt" 2>&1
-echo "✓ Audit complete"
-
+# Show initial progress
+show_progress 0 $TOTAL_STEPS
 echo ""
-echo "Step 2: Generating recommendations..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/02_generate_recommendations.sql > "$RESULTS_DIR/02_recommendations.sql" 2>&1
-echo "✓ Recommendations generated"
 
+echo "${YELLOW}▶${NC} ${BOLD}Step 1/9:${NC} Running database audit (12 sections)..."
+docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/01_database_audit.sql > "$RESULTS_DIR/01_audit_report.txt" 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    printf "${BLUE}.${NC}"
+    sleep 0.5
+done
+wait $PID
+show_progress 1 $TOTAL_STEPS
 echo ""
-echo "Step 3: Testing FK indexes (20 indexes, ~2 min)..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_all_fk_simple.sql > "$RESULTS_DIR/03_fk_test_results.log" 2>&1
-echo "✓ FK tests complete"
+echo "${GREEN}✓${NC} Audit complete"
+echo ""
 
+echo "${YELLOW}▶${NC} ${BOLD}Step 2/9:${NC} Generating index recommendations..."
+docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/02_generate_recommendations.sql > "$RESULTS_DIR/02_recommendations.sql" 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    printf "${BLUE}.${NC}"
+    sleep 0.5
+done
+wait $PID
+show_progress 2 $TOTAL_STEPS
 echo ""
-echo "Step 4: Testing non-FK indexes (4 indexes, ~30 sec)..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_non_fk_indexes.sql > "$RESULTS_DIR/04_non_fk_test_results.log" 2>&1
-echo "✓ Non-FK tests complete"
+echo "${GREEN}✓${NC} Recommendations generated"
+echo ""
 
+echo "${YELLOW}▶${NC} ${BOLD}Step 3/9:${NC} Testing FK indexes (20 indexes, ~2 min)..."
+docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_all_fk_simple.sql > "$RESULTS_DIR/03_fk_test_results.log" 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    printf "${BLUE}.${NC}"
+    sleep 1
+done
+wait $PID
+show_progress 3 $TOTAL_STEPS
 echo ""
-echo "Step 5: Testing schema-based indexes (7 indexes, ~1 min)..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_schema_indexes.sql > "$RESULTS_DIR/05_schema_test_results.log" 2>&1
-echo "✓ Schema tests complete"
+echo "${GREEN}✓${NC} FK tests complete (20/20 tested)"
+echo ""
 
+echo "${YELLOW}▶${NC} ${BOLD}Step 4/9:${NC} Testing non-FK indexes (4 indexes, ~30 sec)..."
+docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_non_fk_indexes.sql > "$RESULTS_DIR/04_non_fk_test_results.log" 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    printf "${BLUE}.${NC}"
+    sleep 0.5
+done
+wait $PID
+show_progress 4 $TOTAL_STEPS
 echo ""
-echo "Step 6: Extracting test results from database..."
+echo "${GREEN}✓${NC} Non-FK tests complete (4/4 tested)"
+echo ""
+
+echo "${YELLOW}▶${NC} ${BOLD}Step 5/9:${NC} Testing schema-based indexes (7 indexes, ~1 min)..."
+docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_schema_indexes.sql > "$RESULTS_DIR/05_schema_test_results.log" 2>&1 &
+PID=$!
+while kill -0 $PID 2>/dev/null; do
+    printf "${BLUE}.${NC}"
+    sleep 0.5
+done
+wait $PID
+show_progress 5 $TOTAL_STEPS
+echo ""
+echo "${GREEN}✓${NC} Schema tests complete (7/7 tested)"
+echo ""
+
+echo "${YELLOW}▶${NC} ${BOLD}Step 6/9:${NC} Extracting test results from database..."
 docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -c "
 COPY (
     SELECT
@@ -66,10 +134,12 @@ COPY (
     ORDER BY test_id
 ) TO STDOUT CSV HEADER
 " > "$RESULTS_DIR/06_test_results.csv" 2>&1
-echo "✓ Results exported to CSV"
-
+show_progress 6 $TOTAL_STEPS
 echo ""
-echo "Step 7: Generating summary statistics..."
+echo "${GREEN}✓${NC} Results exported to CSV"
+echo ""
+
+echo "${YELLOW}▶${NC} ${BOLD}Step 7/9:${NC} Generating summary statistics..."
 docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -c "
 SELECT
     COUNT(DISTINCT table_name) as tables_tested,
@@ -81,10 +151,12 @@ SELECT
 FROM pg_index_test_log
 WHERE test_phase = 'decision';
 " > "$RESULTS_DIR/07_summary_stats.txt" 2>&1
-echo "✓ Summary generated"
-
+show_progress 7 $TOTAL_STEPS
 echo ""
-echo "Step 8: Generating production SQL scripts..."
+echo "${GREEN}✓${NC} Summary generated"
+echo ""
+
+echo "${YELLOW}▶${NC} ${BOLD}Step 8/9:${NC} Generating production SQL scripts..."
 
 # FK indexes
 echo "-- FK Indexes (from test results)" > "$RESULTS_DIR/08_production_fk_indexes.sql"
@@ -114,10 +186,12 @@ WHERE decision = 'KEEP'
 ORDER BY improvement_percent DESC;
 " >> "$RESULTS_DIR/09_production_non_fk_indexes.sql" 2>&1
 
-echo "✓ Production scripts generated"
-
+show_progress 8 $TOTAL_STEPS
 echo ""
-echo "Step 9: Creating summary report..."
+echo "${GREEN}✓${NC} Production scripts generated"
+echo ""
+
+echo "${YELLOW}▶${NC} ${BOLD}Step 9/9:${NC} Creating summary report..."
 cat > "$RESULTS_DIR/00_README.md" <<EOF
 # PostgreSQL Index Analysis Results
 
@@ -161,23 +235,35 @@ psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f 09_production_non_fk_indexes.sql
 Generated by: run_complete_analysis.sh
 EOF
 
-echo "✓ Summary report created"
+show_progress 9 $TOTAL_STEPS
+echo ""
+echo "${GREEN}✓${NC} Summary report created"
+echo ""
 
+# Final summary
 echo ""
-echo "========================================="
-echo "Analysis Complete!"
-echo "========================================="
+echo "${BOLD}=========================================${NC}"
+echo "${BOLD}${GREEN}✓ Analysis Complete!${NC}"
+echo "${BOLD}=========================================${NC}"
 echo ""
-echo "Results saved to: $RESULTS_DIR"
+echo "${BLUE}Results saved to:${NC} ${BOLD}$RESULTS_DIR${NC}"
 echo ""
-echo "Summary:"
+echo "${YELLOW}Summary:${NC}"
 cat "$RESULTS_DIR/07_summary_stats.txt"
 echo ""
-echo "To view results:"
-echo "  cd $RESULTS_DIR"
-echo "  cat 00_README.md"
+echo "${BOLD}Files Generated:${NC}"
+echo "  ${GREEN}✓${NC} 01_audit_report.txt"
+echo "  ${GREEN}✓${NC} 02_recommendations.sql"
+echo "  ${GREEN}✓${NC} 03-05_test_results.log"
+echo "  ${GREEN}✓${NC} 06_test_results.csv"
+echo "  ${GREEN}✓${NC} 07_summary_stats.txt"
+echo "  ${GREEN}✓${NC} 08-09_production_*.sql"
+echo "  ${GREEN}✓${NC} 00_README.md"
 echo ""
-echo "To deploy indexes:"
-echo "  psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f $RESULTS_DIR/08_production_fk_indexes.sql"
-echo "  psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f $RESULTS_DIR/09_production_non_fk_indexes.sql"
+echo "${BOLD}Next Steps:${NC}"
+echo "  ${YELLOW}▶${NC} View: cd $RESULTS_DIR && cat 00_README.md"
+echo "  ${YELLOW}▶${NC} Deploy: psql -f $RESULTS_DIR/08_production_fk_indexes.sql"
+echo "  ${YELLOW}▶${NC} Dashboard: open ../INDEX_DASHBOARD.html"
+echo ""
+echo "${GREEN}${BOLD}Done! 🚀${NC}"
 echo ""
