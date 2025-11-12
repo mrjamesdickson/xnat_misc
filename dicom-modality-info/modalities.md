@@ -23,14 +23,14 @@ RG | Radiographic Imaging | Primary | 1.2.840.10008.5.1.4.1.1.12.2.1 (X-Ray 3D A
 OT | Other | Secondary | Various | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.8.html
 DMS | Dermoscopy | Primary | 1.2.840.10008.5.1.4.1.1.77.1.4 (VL Photographic Image Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.32.html
 CFM | Color Flow Doppler | Primary | 1.2.840.10008.5.1.4.1.1.6.1 (Ultrasound Image Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.7.html
-PA | Photoacoustic Imaging | Primary | 1.2.840.10008.5.1.4.1.1.68.1 (Photoacoustic Image Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.85.html
+PA | Photoacoustic Imaging | Primary | 1.2.840.10008.5.1.4.1.1.68.1 (Photoacoustic Image Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.85.html **(Note: Relatively new modality, verify current standard)**
 ECG | Electrocardiography | Secondary | 1.2.840.10008.5.1.4.1.1.9.1.1 (12-lead ECG Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html
-EMG | Electromyography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html
-EOG | Electrooculography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html
-RESP | Respiration | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html
-POS | Position Sensor | Secondary | 1.2.840.10008.5.1.4.1.1.66.4 (Spatial Registration Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.76.html
-EEG | Electroencephalography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html
-OBJ | Surface Scan | Secondary | 1.2.840.10008.5.1.4.1.1.68.1 (Surface Scan Mesh Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.85.html
+EMG | Electromyography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html **(Note: Placeholder UID - verify specific SOP Class)**
+EOG | Electrooculography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html **(Note: Placeholder UID - verify specific SOP Class)**
+RESP | Respiration | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html **(Note: Placeholder UID - verify specific SOP Class)**
+POS | Position Sensor | Secondary | 1.2.840.10008.5.1.4.1.1.66.4 (Spatial Registration Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.76.html **(Note: Verify if correct SOP Class for position sensor data)**
+EEG | Electroencephalography | Secondary | 1.2.840.10008.5.1.4.1.1.9.x.x (General ECG/Waveform Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.34.html **(Note: Placeholder UID - verify specific SOP Class)**
+OBJ | Surface Scan | Secondary | 1.2.840.10008.5.1.4.1.1.68.1 (Surface Scan Mesh Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.85.html **(Note: May conflict with PA UID above, verify correct UID)**
 ANN | Annotation | Secondary | 1.2.840.10008.5.1.4.1.1.88.x (SR/Presentation State Storage) | https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_A.35.html
 
 Notes:
