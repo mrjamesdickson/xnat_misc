@@ -53,6 +53,16 @@ mkdir -p "$RESULTS_DIR"
 show_progress 0 $TOTAL_STEPS
 echo ""
 
+# Copy SQL files to Docker container
+echo "${BLUE}Preparing:${NC} Copying SQL files to database container..."
+docker cp 01_database_audit.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
+docker cp 02_generate_recommendations.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
+docker cp test_all_fk_simple.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
+docker cp test_non_fk_indexes.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
+docker cp test_schema_indexes.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
+echo "${GREEN}✓${NC} Files copied"
+echo ""
+
 echo "${YELLOW}▶${NC} ${BOLD}Step 1/9:${NC} Running database audit (12 sections)..."
 docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/01_database_audit.sql > "$RESULTS_DIR/01_audit_report.txt" 2>&1 &
 PID=$!
