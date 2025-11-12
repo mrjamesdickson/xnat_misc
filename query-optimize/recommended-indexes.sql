@@ -2,13 +2,35 @@
 -- Purpose: Improve performance of workflow data retrieval queries
 
 -- ============================================================================
+-- IMPORTANT NOTES
+-- ============================================================================
+--
+-- The wrk_workflowdata table ALREADY HAS excellent index coverage:
+-- ✅ wrk_workflowdata_id_btree - Handles WHERE w.id = $1
+-- ✅ wrk_workflowdata_pkey - Primary key on wrk_workflowdata_id
+-- ✅ wrk_workflowdata_status_btree - Status filtering
+-- ✅ wrk_workflowdata_launch_time_btree - Time-based queries
+-- ✅ wrk_workflowdata_workflowdata_info1 - Metadata joins
+--
+-- See schema-wrk_workflowdata.sql for complete index list.
+--
+-- The indexes below focus on JOINED TABLES that need optimization:
+-- - xnat_imageassessordata (assessor lookups)
+-- - xnat_experimentdata (experiment joins)
+-- - xnat_experimentdata_share (share data)
+-- - wrk_workflowdata_meta_data (metadata)
+-- - xdat_user (user lookups)
+--
+-- ============================================================================
 -- PRIMARY INDEXES - Most Important for Query Performance
 -- ============================================================================
 
 -- 1. Index on wrk_workflowdata.id (primary key lookup)
 -- Used in: WHERE w.id = $1 OR w.id IN (...)
-CREATE INDEX IF NOT EXISTS idx_wrk_workflowdata_id
-ON wrk_workflowdata(id);
+-- NOTE: This index already exists as wrk_workflowdata_id_btree
+-- Verify it exists:
+-- SELECT indexname FROM pg_indexes WHERE tablename = 'wrk_workflowdata' AND indexname = 'wrk_workflowdata_id_btree';
+-- CREATE INDEX IF NOT EXISTS idx_wrk_workflowdata_id ON wrk_workflowdata(id);
 
 -- 2. Composite index for image assessor lookups
 -- Used in: JOIN from workflow data to image assessor data
@@ -73,8 +95,9 @@ ON wrk_workflowdata(
 
 -- 9. Index for ORDER BY clause
 -- Used in: ORDER BY q.wrk_workflowdata_id DESC
-CREATE INDEX IF NOT EXISTS idx_wrk_workflowdata_id_desc
-ON wrk_workflowdata(wrk_workflowdata_id DESC);
+-- NOTE: The primary key index wrk_workflowdata_pkey already handles this efficiently
+-- PostgreSQL can traverse btree indexes in reverse order
+-- No additional index needed for DESC ordering on primary key
 
 -- ============================================================================
 -- STATISTICS UPDATE
