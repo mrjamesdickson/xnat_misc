@@ -22,6 +22,48 @@
 -- - xdat_user (user lookups)
 --
 -- ============================================================================
+-- PRE-CHECK: List existing indexes to avoid duplicates
+-- ============================================================================
+
+DO $$
+DECLARE
+    v_index_count INTEGER;
+BEGIN
+    -- Check for existing optimization indexes
+    SELECT COUNT(*)
+    INTO v_index_count
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname IN (
+          'idx_xnat_imageassessordata_imagesession',
+          'idx_xnat_imageassessordata_history_imagesession',
+          'idx_xnat_experimentdata_id',
+          'idx_xnat_experimentdata_share_experiment',
+          'idx_wrk_workflowdata_meta_data_id',
+          'idx_xdat_user_id'
+      );
+
+    IF v_index_count > 0 THEN
+        RAISE NOTICE 'Found % optimization index(es) already exist - will skip those', v_index_count;
+    ELSE
+        RAISE NOTICE 'No optimization indexes found - will create all recommended indexes';
+    END IF;
+
+    -- Show existing indexes on key tables
+    RAISE NOTICE '';
+    RAISE NOTICE '=== Existing Indexes on Image Assessor Tables ===';
+    FOR rec IN
+        SELECT tablename, indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename IN ('xnat_imageassessordata', 'xnat_imageassessordata_history')
+        ORDER BY tablename, indexname
+    LOOP
+        RAISE NOTICE '  %: %', rec.tablename, rec.indexname;
+    END LOOP;
+END $$;
+
+-- ============================================================================
 -- PRIMARY INDEXES - Most Important for Query Performance
 -- ============================================================================
 
