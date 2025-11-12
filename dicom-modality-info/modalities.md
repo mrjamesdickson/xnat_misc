@@ -38,3 +38,9 @@ Notes:
 - Secondary modalities: Derived data, annotations, reports, or measurements from primary acquisitions
 - SOP Class UIDs may vary based on specific image types and DICOM supplements
 - Reference links point to DICOM PS3.3 (Information Object Definitions)
+- **SC (Secondary Capture)** is the general-purpose "catch-all" for secondary/derived images including:
+  - Screenshots or screen captures from workstations
+  - Scanned documents/films converted to DICOM
+  - Processed/derived images without a more specific modality
+  - Images from non-medical devices converted to DICOM
+  - Multi-frame variant available: 1.2.840.10008.5.1.4.1.1.7.1 (Multi-frame Secondary Capture)
