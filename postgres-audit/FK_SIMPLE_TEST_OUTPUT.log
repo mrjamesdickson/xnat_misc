@@ -1,0 +1,120 @@
+Timing is on.
+
+
+psql:/tmp/test_all_fk_simple.sql:8: error: unterminated quoted string
+Time: 0.740 ms
+
+--- ROLLED BACK (<5% improvement) ---
+psql:/tmp/test_all_fk_simple.sql:188: ERROR:  syntax error at or near "'
+\echo '"
+LINE 1: '
+        ^
+ table_name | index_name | improvement_pct 
+------------+------------+-----------------
+(0 rows)
+
+Time: 6.061 ms
+
+--- ERRORS ---
+                  table_name                  |                                       index_name                                        |                         notes                         
+----------------------------------------------+-----------------------------------------------------------------------------------------+-------------------------------------------------------
+ xhbm_container_entity_history                | idx_test_fk_xhbm_container_entity_history_container_entity                              | Test failed: unrecognized format() type specifier "."
+ xhbm_container_entity                        | idx_test_fk_xhbm_container_entity_parent_container_entity                               | Test failed: unrecognized format() type specifier "."
+ xhbm_container_entity_mount                  | idx_test_fk_xhbm_container_entity_mount_container_entity                                | Test failed: unrecognized format() type specifier "."
+ xhbm_container_entity_output                 | idx_test_fk_xhbm_container_entity_output_container_entity                               | Test failed: unrecognized format() type specifier "."
+ xhbm_container_entity_log_paths              | idx_test_fk_xhbm_container_entity_log_paths_container_entity                            | Test failed: unrecognized format() type specifier "."
+ xhbm_timed_event_status_entity               | idx_test_fk_xhbm_timed_event_status_entity_subscription_delivery_entity                 | Test failed: unrecognized format() type specifier "."
+ xhbm_subscription_delivery_entity            | idx_test_fk_xhbm_subscription_delivery_entity_subscription                              | Test failed: unrecognized format() type specifier "."
+ xhbm_subscription_delivery_entity            | idx_test_fk_xhbm_subscription_delivery_entity_triggering_event_entity                   | Test failed: unrecognized format() type specifier "."
+ xnat_experimentdata                          | idx_test_fk_xnat_experimentdata_visit                                                   | Test failed: unrecognized format() type specifier "."
+ xhbm_automation_event_ids_ids                | idx_test_fk_xhbm_automation_event_ids_ids_parent_automation_event_ids                   | Test failed: unrecognized format() type specifier "."
+ icr_roicollectiondata                        | idx_test_fk_icr_roicollectiondata_subjectid                                             | Test failed: unrecognized format() type specifier "."
+ xhbm_configuration                           | idx_test_fk_xhbm_configuration_config_data                                              | Test failed: unrecognized format() type specifier "."
+ xnat_subjectassessordata                     | idx_test_fk_xnat_subjectassessordata_subject_id                                         | Test failed: unrecognized format() type specifier "."
+ xhbm_event_service_filter_entity_project_ids | idx_test_fk_xhbm_event_service_filter_entity_project_ids_event_service_filter_entity    | Test failed: unrecognized format() type specifier "."
+ xnat_experimentdata_resource                 | idx_test_fk_xnat_experimentdata_resource_xnat_abstractresource_xnat_abstractresource_id | Test failed: operator does not exist: integer = text
+ xnat_experimentdata_resource                 | idx_test_fk_xnat_experimentdata_resource_xnat_experimentdata_id                         | Test failed: unrecognized format() type specifier "."
+ img_assessor_out_resource                    | idx_test_fk_img_assessor_out_resource_xnat_abstractresource_xnat_abstractresource_id    | Test failed: operator does not exist: integer = text
+ img_assessor_out_resource                    | idx_test_fk_img_assessor_out_resource_xnat_imageassessordata_id                         | Test failed: unrecognized format() type specifier "."
+ xnat_imageassessordata                       | idx_test_fk_xnat_imageassessordata_imagesession_id                                      | Test failed: unrecognized format() type specifier "."
+ xhbm_automation_filters_values               | idx_test_fk_xhbm_automation_filters_values_automation_filters                           | Test failed: unrecognized format() type specifier "."
+(20 rows)
+
+Time: 1.608 ms
+DO
+Time: 14.964 ms
+
+All test indexes cleaned up
+Results saved in pg_index_test_log table
+
+Timing is on.
+
+=========================================
+Simple FK Index Testing
+=========================================
+
+TRUNCATE TABLE
+Time: 21.395 ms
+CREATE FUNCTION
+Time: 8.699 ms
+Function created
+
+psql:/tmp/test_all_fk_simple.sql:159: NOTICE:  Testing 120 foreign keys...
+psql:/tmp/test_all_fk_simple.sql:159: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:Time: 22.452 ms
+
+=========================================
+SUMMARY
+=========================================
+
+159: ERROR:  for SELECT DISTINCT, ORDER BY expressions must appear in select list
+LINE 13:         ORDER BY pg_relation_size(c.conrelid) DESC
+                          ^
+QUERY:  SELECT DISTINCT
+            c.conrelid::regclass::text AS table_name,
+            a.attname AS column_name,
+            pg_size_pretty(pg_relation_size(c.conrelid)) AS size,
+            (SELECT reltuples::bigint FROM pg_class WHERE oid = c.conrelid) AS rows
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attnum = ANY(c.conkey) AND a.attrelid = c.conrelid
+        WHERE c.contype = 'f'
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_index i
+              WHERE i.indrelid = c.conrelid AND c.conkey[1] = ANY(i.indkey)
+          )
+        ORDER BY pg_relation_size(c.conrelid) DESC
+        LIMIT 20
+CONTEXT:  PL/pgSQL function inline_code_block line 22 at FOR over SELECT rows
+ tables_tested | indexes_tested | kept | rolled_back | errors | avg_improvement_pct 
+---------------+----------------+------+-------------+--------+---------------------
+             0 |              0 |    0 |           0 |      0 |                    
+(1 row)
+
+Time: 3.991 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+ table_name | index_name | improvement_pct 
+------------+------------+-----------------
+(0 rows)
+
+Time: 1.326 ms
+
+--- ROLLED BACK (<5% improvement) ---
+ table_name | index_name | improvement_pct 
+------------+------------+-----------------
+(0 rows)
+
+Time: 0.353 ms
+
+--- ERRORS ---
+ table_name | index_name | notes 
+------------+------------+-------
+(0 rows)
+
+Time: 0.537 ms
+DO
+Time: 9.110 ms
+
+All test indexes cleaned up
+Results saved in pg_index_test_log table
+
