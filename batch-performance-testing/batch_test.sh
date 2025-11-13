@@ -624,10 +624,7 @@ echo "Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS experiments)"
 echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
 echo "Jobs Submitted: $EXPERIMENT_COUNT"
 echo ""
-echo -e "${BLUE}Note: Jobs have been queued and will execute asynchronously.${NC}"
-echo -e "${BLUE}      Check workflow status below or use check_status.sh to monitor.${NC}"
-echo ""
-echo "Results:"
+echo "Submission Results:"
 if [ "$EXPERIMENT_COUNT" -gt 0 ] 2>/dev/null; then
     SUCCESS_PCT=$(awk "BEGIN {printf \"%.1f\", ($SUCCESS_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
     FAIL_PCT=$(awk "BEGIN {printf \"%.1f\", ($FAIL_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
@@ -635,19 +632,19 @@ else
     SUCCESS_PCT="0.0"
     FAIL_PCT="0.0"
 fi
-echo "  Success: $SUCCESS_COUNT (${SUCCESS_PCT}%)"
-echo "  Failed: $FAIL_COUNT (${FAIL_PCT}%)"
+echo "  Successfully Queued: $SUCCESS_COUNT (${SUCCESS_PCT}%)"
+echo "  Failed to Queue: $FAIL_COUNT (${FAIL_PCT}%)"
 echo ""
-echo "Performance:"
+echo "Submission Performance:"
 DURATION_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_DURATION/60}" 2>/dev/null || echo "0.0")
 if [ "$TOTAL_DURATION" -gt 0 ] 2>/dev/null; then
     THROUGHPUT=$(awk "BEGIN {printf \"%.2f\", $EXPERIMENT_COUNT/$TOTAL_DURATION}" 2>/dev/null || echo "0.00")
 else
     THROUGHPUT="0.00"
 fi
-echo "  Total Duration: ${TOTAL_DURATION}s (${DURATION_MIN} min)"
-echo "  Avg Submission Time: ${AVG_DURATION}s"
-echo "  Throughput: ${THROUGHPUT} jobs/sec"
+echo "  Submission Duration: ${TOTAL_DURATION}s (${DURATION_MIN} min)"
+echo "  Avg Time per Job: ${AVG_DURATION}s"
+echo "  Submission Throughput: ${THROUGHPUT} jobs/sec"
 echo ""
 echo -e "${YELLOW}Full log saved to: $LOG_FILE${NC}"
 echo ""
@@ -748,10 +745,13 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo ""
 
             # Show final status summary
-            echo "Final Status:"
+            echo "Execution Results:"
             echo "  Complete: ${COMPLETE:-0}"
             echo "  Failed: ${FAILED:-0}"
-            echo "  Total Runtime: ${ELAPSED_MIN} minutes"
+            echo ""
+            echo "Execution Performance:"
+            echo "  Execution Duration: ${ELAPSED}s (${ELAPSED_MIN} min)"
+            echo "  Total Time (Submission + Execution): $((TOTAL_DURATION + ELAPSED))s ($(awk "BEGIN {printf \"%.1f\", ($TOTAL_DURATION + $ELAPSED)/60}")min)"
             echo ""
 
             # Update log file with execution time
