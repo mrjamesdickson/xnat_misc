@@ -749,9 +749,13 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo "  Complete: ${COMPLETE:-0}"
             echo "  Failed: ${FAILED:-0}"
             echo ""
+            # Calculate total time
+            TOTAL_TIME=$((TOTAL_DURATION + ELAPSED))
+            TOTAL_TIME_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_TIME/60}" 2>/dev/null || echo "0.0")
+
             echo "Execution Performance:"
             echo "  Execution Duration: ${ELAPSED}s (${ELAPSED_MIN} min)"
-            echo "  Total Time (Submission + Execution): $((TOTAL_DURATION + ELAPSED))s ($(awk "BEGIN {printf \"%.1f\", ($TOTAL_DURATION + $ELAPSED)/60}")min)"
+            echo "  Total Time (Submission + Execution): ${TOTAL_TIME}s (${TOTAL_TIME_MIN} min)"
             echo ""
 
             # Update log file with execution time
