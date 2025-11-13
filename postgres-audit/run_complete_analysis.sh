@@ -5,10 +5,15 @@
 
 set -e  # Exit on error
 
+# Get script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 # Colors for better readability
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
@@ -55,12 +60,36 @@ echo ""
 
 # Copy SQL files to Docker container
 echo "${BLUE}Preparing:${NC} Copying SQL files to database container..."
-docker cp 01_database_audit.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
-docker cp 02_generate_recommendations.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
-docker cp test_all_fk_simple.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
-docker cp test_non_fk_indexes.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
-docker cp test_schema_indexes.sql $DOCKER_CONTAINER:/tmp/ 2>/dev/null || true
-echo "${GREEN}✓${NC} Files copied"
+
+# Check if files exist
+REQUIRED_FILES=(
+    "01_database_audit.sql"
+    "02_generate_recommendations.sql"
+    "test_all_fk_simple.sql"
+    "test_non_fk_indexes.sql"
+    "test_schema_indexes.sql"
+)
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "${RED}✗${NC} Error: Required file not found: $file"
+        echo "${YELLOW}Current directory:${NC} $(pwd)"
+        echo "${YELLOW}Required files:${NC}"
+        for f in "${REQUIRED_FILES[@]}"; do
+            echo "  - $f"
+        done
+        exit 1
+    fi
+done
+
+# Copy files
+docker cp 01_database_audit.sql $DOCKER_CONTAINER:/tmp/
+docker cp 02_generate_recommendations.sql $DOCKER_CONTAINER:/tmp/
+docker cp test_all_fk_simple.sql $DOCKER_CONTAINER:/tmp/
+docker cp test_non_fk_indexes.sql $DOCKER_CONTAINER:/tmp/
+docker cp test_schema_indexes.sql $DOCKER_CONTAINER:/tmp/
+
+echo "${GREEN}✓${NC} Files copied (5 SQL files)"
 echo ""
 
 echo "${YELLOW}▶${NC} ${BOLD}Step 1/9:${NC} Running database audit (12 sections)..."
