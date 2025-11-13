@@ -1040,7 +1040,7 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             const chartWidth = width - padding.left - padding.right;
             const chartHeight = height - padding.top - padding.bottom;
 
-            svg.setAttribute('viewBox', \`0 0 \${width} \${height}\`);
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
             // Calculate scales
             const minVal = Math.min(...data);
@@ -1079,9 +1079,9 @@ cat >> "$OUTPUT_FILE" <<'EOF'
                 const y = padding.top + chartHeight - ((value - (maxY !== null ? 0 : minVal)) / range) * chartHeight;
 
                 if (index === 0) {
-                    pathData += \`M \${x} \${y}\`;
+                    pathData += `M ${x} ${y}`;
                 } else {
-                    pathData += \` L \${x} \${y}\`;
+                    pathData += ` L ${x} ${y}`;
                 }
 
                 // Add dot
@@ -1102,7 +1102,7 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             svg.insertBefore(path, svg.firstChild);
 
             // Add area fill
-            const areaData = pathData + \` L \${width - padding.right} \${padding.top + chartHeight} L \${padding.left} \${padding.top + chartHeight} Z\`;
+            const areaData = pathData + ` L ${width - padding.right} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`;
             const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             area.setAttribute('d', areaData);
             area.setAttribute('fill', color);
@@ -1139,13 +1139,13 @@ cat >> "$OUTPUT_FILE" <<'EOF'
                 }
             }
 
-            return \`<p style="margin-top: 10px; color: #7f8c8d;">
+            return `<p style="margin-top: 10px; color: #7f8c8d;">
                 <strong>Latest:</strong> \${latest.toFixed(1)}\${unit} |
                 <strong>Avg:</strong> \${avg.toFixed(1)}\${unit} |
                 <strong>Min:</strong> \${min.toFixed(1)}\${unit} |
                 <strong>Max:</strong> \${max.toFixed(1)}\${unit} |
                 <strong class="\${trendClass}">Trend: \${trend} \${trendSymbol}</strong>
-            </p>\`;
+            </p>`;
         }
 
         // Initialize trend charts
