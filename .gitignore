@@ -8,3 +8,6 @@ Thumbs.db
 *.iml
 *.swp
 *.swo
+
+# Generated artifacts
+postgres-audit/results/
