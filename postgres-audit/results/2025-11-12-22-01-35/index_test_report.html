@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL Index Test Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header .subtitle {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .card-label {
+            font-size: 0.875rem;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .improvement {
+            font-weight: bold;
+        }
+
+        .improvement-high {
+            color: #28a745;
+        }
+
+        .improvement-medium {
+            color: #ffc107;
+        }
+
+        .improvement-low {
+            color: #17a2b8;
+        }
+
+        .improvement-negative {
+            color: #dc3545;
+        }
+
+        .table-name {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #764ba2;
+            cursor: pointer;
+        }
+
+        .table-name:hover {
+            text-decoration: underline;
+        }
+
+        .index-name {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: #555;
+        }
+
+        .sql-code {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            border-left: 4px solid #667eea;
+            margin: 10px 0;
+        }
+
+        .detail-section {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detail-section.active {
+            display: block;
+        }
+
+        .expand-icon {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #764ba2;
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+
+        .expand-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .timestamp {
+            color: #999;
+            font-size: 0.875rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-size: 0.875rem;
+        }
+
+        .filter-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-controls input,
+        .filter-controls select {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        .no-data {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 PostgreSQL Index Test Report</h1>
+            <div class="subtitle">Comprehensive index performance analysis and recommendations</div>
+            <div class="timestamp">Generated: <span id="timestamp"></span></div>
+        </header>
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-title">Tables Tested</div>
+                <div class="card-value">29</div>
+                <div class="card-label">Unique tables analyzed</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Indexes Tested</div>
+                <div class="card-value">38</div>
+                <div class="card-label">Total indexes benchmarked</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Indexes Kept</div>
+                <div class="card-value" style="color: #28a745;">29</div>
+                <div class="card-label">≥5% improvement</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Rolled Back</div>
+                <div class="card-value" style="color: #dc3545;">9</div>
+                <div class="card-label">&lt;5% improvement</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Avg Improvement</div>
+                <div class="card-value" style="color: #28a745;">67.71%</div>
+                <div class="card-label">For kept indexes</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Max Improvement</div>
+                <div class="card-value" style="color: #28a745;">98.01%</div>
+                <div class="card-label">Best performing index</div>
+            </div>
+        </div>
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-title">Tables Tested</div>
+                <div class="card-value"></div>
+                <div class="card-label">Unique tables analyzed</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Indexes Tested</div>
+                <div class="card-value"></div>
+                <div class="card-label">Total indexes benchmarked</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Indexes Kept</div>
+                <div class="card-value" style="color: #28a745;"></div>
+                <div class="card-label">≥5% improvement</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Rolled Back</div>
+                <div class="card-value" style="color: #dc3545;"></div>
+                <div class="card-label">&lt;5% improvement</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Avg Improvement</div>
+                <div class="card-value" style="color: #28a745;">%</div>
+                <div class="card-label">For kept indexes</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Max Improvement</div>
+                <div class="card-value" style="color: #28a745;">%</div>
+                <div class="card-label">Best performing index</div>
+            </div>
+        </div>
+        <div class="section">
+            <h2 class="section-title">📋 Tables Tested</h2>
+            <div class="filter-controls">
+                <input type="text" id="tableFilter" placeholder="Filter by table name..." onkeyup="filterTable()">
+                <select id="statusFilter" onchange="filterTable()">
+                    <option value="">All Status</option>
+                    <option value="has-kept">Has Kept Indexes</option>
+                    <option value="all-rolled">All Rolled Back</option>
+                </select>
+            </div>
+            <table id="tablesTable">
+                <thead>
+                    <tr>
+                        <th>Table Name</th>
+                        <th>Indexes Tested</th>
+                        <th>Kept</th>
+                        <th>Rolled Back</th>
+                        <th>Avg Improvement</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-table="xdat_change_info" data-has-kept="1" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xdat_change_info"></span>
+                            <span class="table-name" onclick="toggleDetails('xdat_change_info')">xdat_change_info</span>
+                        </td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td class="improvement improvement-high">98.01%</td>
+                        <td><span class='badge badge-success'>1 Kept</span> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xdat_change_info" class="detail-section">
+                                <h3>Index Details for xdat_change_info</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_change_info_date</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">98.01% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_change_info_date ON xdat_change_info (...);  -- 98.01% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xdat_change_info_change_user</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-36.30% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: change_user
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_environment_variables" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_environment_variables"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_environment_variables')">xhbm_container_entity_environment_variables</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">94.50%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_environment_variables" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_environment_variables</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_environment_variables_environment_variables</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">94.50% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: environment_variables
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_environment_variables_environment_variables ON xhbm_container_entity_environment_variables (...);  -- 94.50% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="wrk_workflowdata_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-wrk_workflowdata_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('wrk_workflowdata_meta_data')">wrk_workflowdata_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">92.83%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-wrk_workflowdata_meta_data" class="detail-section">
+                                <h3>Index Details for wrk_workflowdata_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_wrk_workflowdata_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">92.83% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_wrk_workflowdata_meta_data_xft_version ON wrk_workflowdata_meta_data (...);  -- 92.83% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_dicom_spatial_data" data-has-kept="2" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_dicom_spatial_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_dicom_spatial_data')">xhbm_dicom_spatial_data</span>
+                        </td>
+                        <td>2</td>
+                        <td>2</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">89.88%</td>
+                        <td><span class='badge badge-success'>2 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_dicom_spatial_data" class="detail-section">
+                                <h3>Index Details for xhbm_dicom_spatial_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_dicom_series</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">95.47% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_dicom_series ON xhbm_dicom_spatial_data (...);  -- 95.47% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_dicom_spatial_data_created</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">84.28% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: created
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_dicom_spatial_data_created ON xhbm_dicom_spatial_data (...);  -- 84.28% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_resource" data-has-kept="1" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_resource"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_resource')">xnat_resource</span>
+                        </td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td class="improvement improvement-high">88.17%</td>
+                        <td><span class='badge badge-success'>1 Kept</span> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_resource" class="detail-section">
+                                <h3>Index Details for xnat_resource</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_resource_format</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">88.17% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_resource_format ON xnat_resource (...);  -- 88.17% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_resource_uri</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-68.73% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: uri
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="wrk_workflowdata" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-wrk_workflowdata"></span>
+                            <span class="table-name" onclick="toggleDetails('wrk_workflowdata')">wrk_workflowdata</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">87.41%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-wrk_workflowdata" class="detail-section">
+                                <h3>Index Details for wrk_workflowdata</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_wrk_workflowdata_comments</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">87.41% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: comments
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_wrk_workflowdata_comments ON wrk_workflowdata (...);  -- 87.41% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_resource_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_resource_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_resource_meta_data')">xnat_resource_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">86.97%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_resource_meta_data" class="detail-section">
+                                <h3>Index Details for xnat_resource_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_resource_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">86.97% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_resource_meta_data_xft_version ON xnat_resource_meta_data (...);  -- 86.97% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_log_paths" data-has-kept="2" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_log_paths"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_log_paths')">xhbm_container_entity_log_paths</span>
+                        </td>
+                        <td>2</td>
+                        <td>2</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">86.51%</td>
+                        <td><span class='badge badge-success'>2 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_log_paths" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_log_paths</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_log_paths_container_entity</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">88.70% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: container_entity
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_log_paths_container_entity ON xhbm_container_entity_log_paths (...);  -- 88.70% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_log_paths_container</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">84.32% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_log_paths_container ON xhbm_container_entity_log_paths (...);  -- 84.32% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_resourcecatalog_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_resourcecatalog_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_resourcecatalog_meta_data')">xnat_resourcecatalog_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">83.18%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_resourcecatalog_meta_data" class="detail-section">
+                                <h3>Index Details for xnat_resourcecatalog_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_resourcecatalog_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">83.18% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_resourcecatalog_meta_data_xft_version ON xnat_resourcecatalog_meta_data (...);  -- 83.18% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_mount" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_mount"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_mount')">xhbm_container_entity_mount</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">82.06%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_mount" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_mount</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_mount_container_host_path</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">82.06% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: container_host_path
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_mount_container_host_path ON xhbm_container_entity_mount (...);  -- 82.06% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xdat_user_login" data-has-kept="2" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xdat_user_login"></span>
+                            <span class="table-name" onclick="toggleDetails('xdat_user_login')">xdat_user_login</span>
+                        </td>
+                        <td>3</td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td class="improvement improvement-high">82.00%</td>
+                        <td><span class='badge badge-success'>2 Kept</span> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xdat_user_login" class="detail-section">
+                                <h3>Index Details for xdat_user_login</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_query_user_login_session</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">89.93% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Query-based: session_id
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_query_user_login_session ON xdat_user_login (...);  -- 89.93% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xdat_user_login_login_date</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">74.07% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: login_date
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xdat_user_login_login_date ON xdat_user_login (...);  -- 74.07% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_user_login_active</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-22.18% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xdat_user_login_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xdat_user_login_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xdat_user_login_meta_data')">xdat_user_login_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-high">81.38%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xdat_user_login_meta_data" class="detail-section">
+                                <h3>Index Details for xdat_user_login_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xdat_user_login_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">81.38% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xdat_user_login_meta_data_xft_version ON xdat_user_login_meta_data (...);  -- 81.38% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity')">xhbm_container_entity</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-medium">79.49%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_created</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">79.49% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: created
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_created ON xhbm_container_entity (...);  -- 79.49% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_abstractresource_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_abstractresource_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_abstractresource_meta_data')">xnat_abstractresource_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-medium">76.57%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_abstractresource_meta_data" class="detail-section">
+                                <h3>Index Details for xnat_abstractresource_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_abstractresource_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">76.57% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_abstractresource_meta_data_xft_version ON xnat_abstractresource_meta_data (...);  -- 76.57% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xs_item_cache" data-has-kept="2" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xs_item_cache"></span>
+                            <span class="table-name" onclick="toggleDetails('xs_item_cache')">xs_item_cache</span>
+                        </td>
+                        <td>2</td>
+                        <td>2</td>
+                        <td>0</td>
+                        <td class="improvement improvement-medium">67.44%</td>
+                        <td><span class='badge badge-success'>2 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xs_item_cache" class="detail-section">
+                                <h3>Index Details for xs_item_cache</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xs_item_cache_elementname</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">67.65% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: elementname
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xs_item_cache_elementname ON xs_item_cache (...);  -- 67.65% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_query_item_cache_element_ids</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">67.22% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Query-based: elementName, ids
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_query_item_cache_element_ids ON xs_item_cache (...);  -- 67.22% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_ctscandata_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_ctscandata_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_ctscandata_meta_data')">xnat_ctscandata_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-medium">59.15%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_ctscandata_meta_data" class="detail-section">
+                                <h3>Index Details for xnat_ctscandata_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_ctscandata_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">59.15% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_ctscandata_meta_data_xft_version ON xnat_ctscandata_meta_data (...);  -- 59.15% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_container_labels" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_container_labels"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_container_labels')">xhbm_container_entity_container_labels</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-medium">52.62%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_container_labels" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_container_labels</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_container_labels_container_labels</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">52.62% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: container_labels
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_container_labels_container_labels ON xhbm_container_entity_container_labels (...);  -- 52.62% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_imagescandata" data-has-kept="2" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_imagescandata"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_imagescandata')">xnat_imagescandata</span>
+                        </td>
+                        <td>3</td>
+                        <td>2</td>
+                        <td>1</td>
+                        <td class="improvement improvement-medium">50.94%</td>
+                        <td><span class='badge badge-success'>2 Kept</span> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_imagescandata" class="detail-section">
+                                <h3>Index Details for xnat_imagescandata</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_imagescan_modality</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">69.11% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_imagescan_modality ON xnat_imagescandata (...);  -- 69.11% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_imagescan_uid</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">32.77% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Schema-based index
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_imagescan_uid ON xnat_imagescandata (...);  -- 32.77% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_imagescandata_image_session_id</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-5.04% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: image_session_id
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_ctscandata" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_ctscandata"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_ctscandata')">xnat_ctscandata</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">37.51%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_ctscandata" class="detail-section">
+                                <h3>Index Details for xnat_ctscandata</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_ctscandata_parameters_voxelres_x</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">37.51% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: parameters_voxelres_x
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_ctscandata_parameters_voxelres_x ON xnat_ctscandata (...);  -- 37.51% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_resourcecatalog" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_resourcecatalog"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_resourcecatalog')">xnat_resourcecatalog</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">32.50%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_resourcecatalog" class="detail-section">
+                                <h3>Index Details for xnat_resourcecatalog</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_resourcecatalog_resourcecatalog_info</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">32.50% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: resourcecatalog_info
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_resourcecatalog_resourcecatalog_info ON xnat_resourcecatalog (...);  -- 32.50% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_imagescandata_meta_data" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_imagescandata_meta_data"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_imagescandata_meta_data')">xnat_imagescandata_meta_data</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">28.89%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_imagescandata_meta_data" class="detail-section">
+                                <h3>Index Details for xnat_imagescandata_meta_data</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_imagescandata_meta_data_xft_version</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">28.89% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: xft_version
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_imagescandata_meta_data_xft_version ON xnat_imagescandata_meta_data (...);  -- 28.89% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xdat_field_mapping" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xdat_field_mapping"></span>
+                            <span class="table-name" onclick="toggleDetails('xdat_field_mapping')">xdat_field_mapping</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">21.50%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xdat_field_mapping" class="detail-section">
+                                <h3>Index Details for xdat_field_mapping</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xdat_field_mapping_field</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">21.50% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: field
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xdat_field_mapping_field ON xdat_field_mapping (...);  -- 21.50% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_preference" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_preference"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_preference')">xhbm_preference</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">14.88%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_preference" class="detail-section">
+                                <h3>Index Details for xhbm_preference</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_query_preference_tool_name</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">14.88% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Query-based: tool, name
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_query_preference_tool_name ON xhbm_preference (...);  -- 14.88% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_experimentdata" data-has-kept="1" data-rolled="0">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_experimentdata"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_experimentdata')">xnat_experimentdata</span>
+                        </td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td class="improvement improvement-low">12.59%</td>
+                        <td><span class='badge badge-success'>1 Kept</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_experimentdata" class="detail-section">
+                                <h3>Index Details for xnat_experimentdata</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_experimentdata_date</strong>
+                                        <span class='badge badge-success'>KEPT</span>
+                                        <span class="improvement" style="margin-left: 10px;">12.59% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: date
+                                    </div>
+                                    <div class="sql-code">CREATE INDEX IF NOT EXISTS idx_large_xnat_experimentdata_date ON xnat_experimentdata (...);  -- 12.59% improvement</div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_history" data-has-kept="0" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_history"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_history')">xhbm_container_entity_history</span>
+                        </td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td>1</td>
+                        <td class="improvement ">%</td>
+                        <td> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_history" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_history</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_history_entity_id</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-217.48% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: entity_id
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xhbm_container_entity_input" data-has-kept="0" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xhbm_container_entity_input"></span>
+                            <span class="table-name" onclick="toggleDetails('xhbm_container_entity_input')">xhbm_container_entity_input</span>
+                        </td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td>1</td>
+                        <td class="improvement ">%</td>
+                        <td> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xhbm_container_entity_input" class="detail-section">
+                                <h3>Index Details for xhbm_container_entity_input</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xhbm_container_entity_input_name</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">3.21% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: name
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_abstractresource" data-has-kept="0" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_abstractresource"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_abstractresource')">xnat_abstractresource</span>
+                        </td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td>1</td>
+                        <td class="improvement ">%</td>
+                        <td> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_abstractresource" class="detail-section">
+                                <h3>Index Details for xnat_abstractresource</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_abstractresource_label</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-125.28% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: label
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_addfield" data-has-kept="0" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_addfield"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_addfield')">xnat_addfield</span>
+                        </td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td>1</td>
+                        <td class="improvement ">%</td>
+                        <td> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_addfield" class="detail-section">
+                                <h3>Index Details for xnat_addfield</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_large_xnat_addfield_addfield</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-131.77% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Column: addfield
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="xnat_imagesessiondata_history" data-has-kept="0" data-rolled="1">
+                        <td>
+                            <span class="expand-icon" id="icon-xnat_imagesessiondata_history"></span>
+                            <span class="table-name" onclick="toggleDetails('xnat_imagesessiondata_history')">xnat_imagesessiondata_history</span>
+                        </td>
+                        <td>1</td>
+                        <td>0</td>
+                        <td>1</td>
+                        <td class="improvement ">%</td>
+                        <td> <span class='badge badge-danger'>1 Rolled Back</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-xnat_imagesessiondata_history" class="detail-section">
+                                <h3>Index Details for xnat_imagesessiondata_history</h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name">idx_test_query_imagesession_history</strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">-11.49% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        Query-based: id, change_date
+                                    </div>
+                                </div>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr data-table="" data-has-kept="" data-rolled="">
+                        <td>
+                            <span class="expand-icon" id="icon-"></span>
+                            <span class="table-name" onclick="toggleDetails('')"></span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td class="improvement ">%</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="padding: 0;">
+                            <div id="details-" class="detail-section">
+                                <h3>Index Details for </h3>
+                                <div style="margin: 15px 0; padding: 15px; background: white; border-radius: 4px;">
+                                    <div style="margin-bottom: 10px;">
+                                        <strong class="index-name"></strong>
+                                        <span class='badge badge-danger'>ROLLED BACK</span>
+                                        <span class="improvement" style="margin-left: 10px;">% improvement</span>
+                                    </div>
+                                    <div style="color: #666; font-size: 0.875rem; margin-bottom: 8px;">
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🚀 Next Steps</h2>
+            <div class="actions">
+                <a href="08_production_fk_indexes.sql" class="btn btn-primary">📄 View FK Indexes SQL</a>
+                <a href="09_production_non_fk_indexes.sql" class="btn btn-primary">📄 View Non-FK Indexes SQL</a>
+                <a href="06_test_results.csv" class="btn btn-secondary">📊 Download CSV Data</a>
+                <a href="00_README.md" class="btn btn-secondary">📖 View Full Report</a>
+            </div>
+            <div style="margin-top: 20px; padding: 20px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>⚠️ Important:</strong> Review all indexes before deploying to production. Test in a development environment first.
+            </div>
+        </div>
+
+        <footer>
+            <p>Generated by PostgreSQL Index Testing Suite</p>
+            <p>Database: <code id="dbname"></code> | Container: <code id="container"></code></p>
+        </footer>
+    </div>
+
+    <script>
+        // Set timestamp
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        document.getElementById('dbname').textContent = '$DB_NAME';
+        document.getElementById('container').textContent = '$DOCKER_CONTAINER';
+
+        // Toggle details
+        function toggleDetails(tableId) {
+            const details = document.getElementById('details-' + tableId);
+            const icon = document.getElementById('icon-' + tableId);
+            details.classList.toggle('active');
+            icon.classList.toggle('expanded');
+        }
+
+        // Filter table
+        function filterTable() {
+            const nameFilter = document.getElementById('tableFilter').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const rows = document.querySelectorAll('#tablesTable tbody tr[data-table]');
+
+            rows.forEach(row => {
+                const nextRow = row.nextElementSibling; // Detail row
+                const tableName = row.getAttribute('data-table').toLowerCase();
+                const hasKept = parseInt(row.getAttribute('data-has-kept'));
+                const rolled = parseInt(row.getAttribute('data-rolled'));
+
+                let showRow = true;
+
+                // Name filter
+                if (nameFilter && !tableName.includes(nameFilter)) {
+                    showRow = false;
+                }
+
+                // Status filter
+                if (statusFilter === 'has-kept' && hasKept === 0) {
+                    showRow = false;
+                } else if (statusFilter === 'all-rolled' && hasKept > 0) {
+                    showRow = false;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                nextRow.style.display = showRow ? '' : 'none';
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                document.getElementById('tableFilter').focus();
+            }
+        });
+    </script>
+</body>
+</html>

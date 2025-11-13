@@ -1,0 +1,24 @@
+ tables_tested | indexes_tested | indexes_kept | indexes_rolled_back | avg_improvement_pct | max_improvement_pct 
+---------------+----------------+--------------+---------------------+---------------------+---------------------
+            12 |             16 |           12 |                   4 |               69.42 |               98.11
+(1 row)
+
+
+Tables Tested:
+-------------
+           table_name            | indexes_tested | kept | rolled_back | avg_improvement 
+---------------------------------+----------------+------+-------------+-----------------
+ xdat_change_info                |              2 |    1 |           1 |           98.11
+ xnat_resource                   |              1 |    1 |           0 |           94.82
+ xhbm_dicom_spatial_data         |              1 |    1 |           0 |           92.11
+ wrk_workflowdata                |              1 |    1 |           0 |           87.28
+ xs_item_cache                   |              1 |    1 |           0 |           68.30
+ xhbm_container_entity_log_paths |              1 |    1 |           0 |           66.09
+ xdat_user_login                 |              3 |    3 |           0 |           62.76
+ xnat_imagescandata              |              2 |    2 |           0 |           56.76
+ xnat_imagesessiondata_history   |              1 |    1 |           0 |           24.47
+ xhbm_container_entity_history   |              1 |    0 |           1 |                
+ xhbm_container_entity_input     |              1 |    0 |           1 |                
+ xhbm_preference                 |              1 |    0 |           1 |                
+(12 rows)
+

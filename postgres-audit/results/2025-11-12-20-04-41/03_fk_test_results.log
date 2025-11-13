@@ -1,0 +1,251 @@
+Timing is on.
+
+=========================================
+Simple FK Index Testing
+=========================================
+
+TRUNCATE TABLE
+Time: 22.949 ms
+CREATE FUNCTION
+Time: 21.391 ms
+Function created
+
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Testing 120 foreign keys...
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 1/120: xhbm_container_entity_history.container_entity (12 MB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 11.8192000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 5.5620000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 52.94.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 2/120: xhbm_container_entity.parent_container_entity (5824 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 3.5654000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.28720000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 91.94.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 3/120: xhbm_container_entity_mount.container_entity (4952 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 3.8642000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 2.7632000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 28.49.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 4/120: xhbm_container_entity_output.container_entity (2392 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 3.6222000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 1.5064000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 58.41.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 5/120: xhbm_container_entity_log_paths.container_entity (1856 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 1.5286000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 1.3206000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 13.61.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 6/120: xhbm_timed_event_status_entity.subscription_delivery_entity (488 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.86340000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.73320000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 15.08.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 7/120: xhbm_subscription_delivery_entity.subscription (288 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.56880000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.47420000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 16.63.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 8/120: xhbm_subscription_delivery_entity.triggering_event_entity (288 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.28720000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.36500000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ROLLBACK - only improved by -27.09.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 9/120: xnat_experimentdata.visit (272 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 1.6456000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.30800000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 81.28.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 10/120: xhbm_automation_event_ids_ids.parent_automation_event_ids (216 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.58640000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.39520000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 32.61.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 11/120: icr_roicollectiondata.subjectid (160 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.78880000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.33060000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 58.09.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 12/120: xhbm_configuration.config_data (160 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.47240000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.24620000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 47.88.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 13/120: xnat_subjectassessordata.subject_id (120 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 1.02460000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.63700000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 37.83.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 14/120: xhbm_event_service_filter_entity_project_ids.event_service_filter_entity (112 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.66060000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.43700000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 33.85.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 15/120: xnat_experimentdata_resource.xnat_abstractresource_xnat_abstractresource_id (104 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.52320000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.34920000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 33.26.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 16/120: xnat_experimentdata_resource.xnat_experimentdata_id (104 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.24260000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.34780000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ROLLBACK - only improved by -43.36.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 17/120: img_assessor_out_resource.xnat_abstractresource_xnat_abstractresource_id (72 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.53960000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.28440000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 47.29.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 18/120: img_assessor_out_resource.xnat_imageassessordata_id (72 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.50000000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.26520000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 46.96.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 19/120: xnat_imageassessordata.imagesession_id (40 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 1.00040000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.24840000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  KEEP - improved by 75.17.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Test 20/120: xhbm_automation_filters_values.automation_filters (16 kB)
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ========================================
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Baseline: 0.23060000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  Index created
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  With index: 0.22500000000000000000.2f ms
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  ROLLBACK - only improved by 2.43.2f%
+psql:/tmp/test_all_fk_simple.sql:160: NOTICE:  
+DO
+Time: 1553.261 ms (00:01.553)
+
+=========================================
+SUMMARY
+=========================================
+
+ tables_tested | indexes_tested | kept | rolled_back | errors | avg_improvement_pct 
+---------------+----------------+------+-------------+--------+---------------------
+            17 |             20 |   17 |           3 |      0 |               45.37
+(1 row)
+
+Time: 8.714 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+                  table_name                  |   index_name   | improvement_pct 
+----------------------------------------------+----------------+-----------------
+ xhbm_container_entity                        | idx_test_fk_2  |           91.94
+ xnat_experimentdata                          | idx_test_fk_9  |           81.28
+ xnat_imageassessordata                       | idx_test_fk_19 |           75.17
+ xhbm_container_entity_output                 | idx_test_fk_4  |           58.41
+ icr_roicollectiondata                        | idx_test_fk_11 |           58.09
+ xhbm_container_entity_history                | idx_test_fk_1  |           52.94
+ xhbm_configuration                           | idx_test_fk_12 |           47.88
+ img_assessor_out_resource                    | idx_test_fk_17 |           47.29
+ img_assessor_out_resource                    | idx_test_fk_18 |           46.96
+ xnat_subjectassessordata                     | idx_test_fk_13 |           37.83
+ xhbm_event_service_filter_entity_project_ids | idx_test_fk_14 |           33.85
+ xnat_experimentdata_resource                 | idx_test_fk_15 |           33.26
+ xhbm_automation_event_ids_ids                | idx_test_fk_10 |           32.61
+ xhbm_container_entity_mount                  | idx_test_fk_3  |           28.49
+ xhbm_subscription_delivery_entity            | idx_test_fk_7  |           16.63
+ xhbm_timed_event_status_entity               | idx_test_fk_6  |           15.08
+ xhbm_container_entity_log_paths              | idx_test_fk_5  |           13.61
+(17 rows)
+
+Time: 1.143 ms
+
+--- ROLLED BACK (<5% improvement) ---
+            table_name             |   index_name   | improvement_pct 
+-----------------------------------+----------------+-----------------
+ xhbm_automation_filters_values    | idx_test_fk_20 |            2.43
+ xhbm_subscription_delivery_entity | idx_test_fk_8  |          -27.09
+ xnat_experimentdata_resource      | idx_test_fk_16 |          -43.36
+(3 rows)
+
+Time: 0.282 ms
+
+--- ERRORS ---
+ table_name | index_name | notes 
+------------+------------+-------
+(0 rows)
+
+Time: 0.608 ms
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_1
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_10
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_11
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_12
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_13
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_14
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_15
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_17
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_18
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_19
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_2
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_3
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_4
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_5
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_6
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_7
+psql:/tmp/test_all_fk_simple.sql:218: NOTICE:  Dropped: idx_test_fk_9
+DO
+Time: 42.296 ms
+
+All test indexes cleaned up
+Results saved in pg_index_test_log table
+

@@ -1,0 +1,12 @@
+-- Non-FK Indexes (from test results)
+ CREATE INDEX IF NOT EXISTS idx_large_wrk_workflowdata_comments ON wrk_workflowdata(...);  -- 85.76% improvement (Column: comments)
+ CREATE INDEX IF NOT EXISTS idx_large_xhbm_dicom_spatial_data_created ON xhbm_dicom_spatial_data(...);  -- 84.59% improvement (Column: created)
+ CREATE INDEX IF NOT EXISTS idx_large_xdat_user_login_login_date ON xdat_user_login(...);  -- 83.73% improvement (Column: login_date)
+ CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_mount_container_host_path ON xhbm_container_entity_mount(...);  -- 82.43% improvement (Column: container_host_path)
+ CREATE INDEX IF NOT EXISTS idx_large_wrk_workflowdata_meta_data_xft_version ON wrk_workflowdata_meta_data(...);  -- 77.89% improvement (Column: xft_version)
+ CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_log_paths_container_entity ON xhbm_container_entity_log_paths(...);  -- 69.39% improvement (Column: container_entity)
+ CREATE INDEX IF NOT EXISTS idx_large_xhbm_container_entity_created ON xhbm_container_entity(...);  -- 69.27% improvement (Column: created)
+ CREATE INDEX IF NOT EXISTS idx_imagesession_history_id_date ON xnat_imagesessiondata_history(...);  -- 58.11% improvement (Columns: id, change_date)
+ CREATE INDEX IF NOT EXISTS idx_large_xs_item_cache_elementname ON xs_item_cache(...);  -- 19.06% improvement (Column: elementname)
+ CREATE INDEX IF NOT EXISTS idx_large_xnat_experimentdata_date ON xnat_experimentdata(...);  -- 6.92% improvement (Column: date)
+

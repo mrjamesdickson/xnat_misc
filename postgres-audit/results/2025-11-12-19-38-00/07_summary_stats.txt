@@ -1,0 +1,5 @@
+ tables_tested | indexes_tested | indexes_kept | indexes_rolled_back | avg_improvement_pct | max_improvement_pct 
+---------------+----------------+--------------+---------------------+---------------------+---------------------
+             6 |              7 |            7 |                   0 |               67.82 |               99.00
+(1 row)
+

@@ -43,8 +43,71 @@ done
 # Remove trailing slash from host
 XNAT_HOST="${XNAT_HOST%/}"
 
+# Historical database
+HISTORY_DB=".cache/performance_history.json"
+mkdir -p "$(dirname "$HISTORY_DB")"
+
+# Initialize history database if it doesn't exist
+if [ ! -f "$HISTORY_DB" ]; then
+    echo '{}' > "$HISTORY_DB"
+fi
+
 echo -e "${GREEN}=== HTML Report Generator ===${NC}"
 echo ""
+
+# Function to record metrics in history database
+record_metrics() {
+    local host="$1"
+    local project="$2"
+    local container="$3"
+    local timestamp="$4"
+    local submission_time="$5"
+    local execution_time="$6"
+    local throughput="$7"
+    local success_count="$8"
+    local fail_count="$9"
+    local total_jobs="${10}"
+
+    # Create unique key: host|project|container
+    local key="${host}|${project}|${container}"
+
+    # Extract numeric values
+    local sub_seconds=$(echo "$submission_time" | awk '{print $1}' | sed 's/s$//')
+    local exec_seconds=$(echo "$execution_time" | awk '{print $1}' | sed 's/s$//')
+    local throughput_num=$(echo "$throughput" | awk '{print $1}')
+
+    # Build new entry
+    local new_entry=$(cat <<ENTRY
+{
+  "timestamp": "$timestamp",
+  "submission_time": $sub_seconds,
+  "execution_time": ${exec_seconds:-0},
+  "throughput": ${throughput_num:-0},
+  "success_count": $success_count,
+  "fail_count": $fail_count,
+  "total_jobs": $total_jobs
+}
+ENTRY
+)
+
+    # Update history database using jq
+    local temp_file=$(mktemp)
+    jq --arg key "$key" --argjson entry "$new_entry" '
+        .[$key] = (.[$key] // []) + [$entry] |
+        .[$key] |= (sort_by(.timestamp) | .[-50:])
+    ' "$HISTORY_DB" > "$temp_file" && mv "$temp_file" "$HISTORY_DB"
+}
+
+# Function to get historical data
+get_history() {
+    local host="$1"
+    local project="$2"
+    local container="$3"
+
+    local key="${host}|${project}|${container}"
+
+    jq -r --arg key "$key" '.[$key] // []' "$HISTORY_DB"
+}
 
 # If -a flag is set, process all logs
 if [ "$ALL_LOGS" = true ]; then
@@ -308,6 +371,18 @@ FINAL_STATUS=$(grep "^Final Status:" "$LOG_FILE" | tail -1 | sed 's/Final Status
 SUCCESS_COUNT=$(echo "$SUCCESSFUL" | sed -E 's/^([0-9]+).*/\1/' || echo "0")
 FAIL_COUNT=$(echo "$FAILED" | sed -E 's/^([0-9]+).*/\1/' || echo "0")
 
+# Record metrics to history database
+if [ -n "$HOST" ] && [ -n "$PROJECT" ] && [ -n "$CONTAINER" ] && [ -n "$TEST_STARTED" ]; then
+    echo -e "${YELLOW}Recording metrics to history database...${NC}"
+    record_metrics "$HOST" "$PROJECT" "$CONTAINER" "$TEST_STARTED" "$TOTAL_DURATION" "$EXECUTION_TIME" "$THROUGHPUT" "$SUCCESS_COUNT" "$FAIL_COUNT" "$JOBS_SUBMITTED"
+fi
+
+# Get historical data for this container
+HISTORICAL_DATA="[]"
+if [ -n "$HOST" ] && [ -n "$PROJECT" ] && [ -n "$CONTAINER" ]; then
+    HISTORICAL_DATA=$(get_history "$HOST" "$PROJECT" "$CONTAINER")
+fi
+
 # Generate HTML report
 echo -e "${YELLOW}Generating HTML report...${NC}"
 
@@ -450,6 +525,73 @@ cat > "$OUTPUT_FILE" <<EOF
             padding: 20px;
             background: #f8f9fa;
             border-radius: 8px;
+        }
+
+        .trend-charts {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .chart-wrapper {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .chart-wrapper h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .chart-wrapper canvas {
+            max-height: 300px;
+        }
+
+        .svg-chart {
+            width: 100%;
+            height: 250px;
+            border: 1px solid #ecf0f1;
+            border-radius: 4px;
+        }
+
+        .chart-data-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .chart-data-table th {
+            background: #ecf0f1;
+            padding: 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .chart-data-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .chart-data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .trend-up {
+            color: #e74c3c;
+        }
+
+        .trend-down {
+            color: #27ae60;
+        }
+
+        .trend-stable {
+            color: #95a5a6;
         }
 
         .progress-bar-container {
@@ -648,15 +790,37 @@ cat > "$OUTPUT_FILE" <<EOF
                     <div class="stat-sublabel">$FAILED</div>
                 </div>
                 <div class="stat-card performance">
-                    <div class="stat-label">Total Duration</div>
-                    <div class="stat-value">$(echo "$TOTAL_DURATION" | awk '{print $1}')</div>
+                    <div class="stat-label">Submission Time</div>
+                    <div class="stat-value">$(echo "$TOTAL_DURATION" | awk '{print $1}' | sed 's/s$//')</div>
                     <div class="stat-sublabel">$TOTAL_DURATION</div>
                 </div>
+EOF
+
+# Add execution time card if available
+if [ -n "$EXECUTION_TIME" ]; then
+    cat >> "$OUTPUT_FILE" <<EOF
+                <div class="stat-card performance">
+                    <div class="stat-label">Execution Time</div>
+                    <div class="stat-value">$(echo "$EXECUTION_TIME" | awk '{print $1}' | sed 's/s$//')</div>
+                    <div class="stat-sublabel">$EXECUTION_TIME</div>
+                </div>
+                <div class="stat-card performance">
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value">$(echo "$TOTAL_WITH_EXECUTION" | awk '{print $1}' | sed 's/s$//')</div>
+                    <div class="stat-sublabel">$TOTAL_WITH_EXECUTION</div>
+                </div>
+EOF
+else
+    cat >> "$OUTPUT_FILE" <<EOF
                 <div class="stat-card performance">
                     <div class="stat-label">Throughput</div>
                     <div class="stat-value">$(echo "$THROUGHPUT" | awk '{print $1}')</div>
                     <div class="stat-sublabel">$THROUGHPUT</div>
                 </div>
+EOF
+fi
+
+cat >> "$OUTPUT_FILE" <<EOF
             </div>
 
             <div class="chart-container">
@@ -671,6 +835,90 @@ cat > "$OUTPUT_FILE" <<EOF
                 </div>
             </div>
         </div>
+
+EOF
+
+# Generate trend charts if we have historical data
+HISTORY_COUNT=$(echo "$HISTORICAL_DATA" | jq 'length' 2>/dev/null || echo "0")
+
+if [ "$HISTORY_COUNT" -gt 0 ]; then
+    cat >> "$OUTPUT_FILE" <<'EOF'
+        <div class="section" id="trend-section">
+            <h2 class="section-title">Performance Trends</h2>
+            <p class="subtitle">Historical performance data for this container (last 50 runs)</p>
+
+            <div class="trend-charts">
+                <div class="chart-wrapper">
+                    <h3>⏱️ Submission Time Trend</h3>
+                    <svg id="submissionChart" class="svg-chart"></svg>
+                    <div id="submissionStats"></div>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>⚡ Execution Time Trend</h3>
+                    <svg id="executionChart" class="svg-chart"></svg>
+                    <div id="executionStats"></div>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>📊 Throughput Trend</h3>
+                    <svg id="throughputChart" class="svg-chart"></svg>
+                    <div id="throughputStats"></div>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>✅ Success Rate Trend</h3>
+                    <svg id="successRateChart" class="svg-chart"></svg>
+                    <div id="successStats"></div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 30px; color: #2c3e50;">Recent Performance History</h3>
+EOF
+
+    # Generate table with last 10 runs
+    cat >> "$OUTPUT_FILE" <<'EOF'
+            <table class="chart-data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Submission (s)</th>
+                        <th>Execution (s)</th>
+                        <th>Throughput</th>
+                        <th>Success Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+EOF
+
+    # Add last 10 rows from historical data
+    echo "$HISTORICAL_DATA" | jq -r '.[-10:] | reverse | .[] |
+        @json' | while IFS= read -r row; do
+        timestamp=$(echo "$row" | jq -r '.timestamp')
+        submission=$(echo "$row" | jq -r '.submission_time')
+        execution=$(echo "$row" | jq -r '.execution_time')
+        throughput=$(echo "$row" | jq -r '.throughput')
+        success_count=$(echo "$row" | jq -r '.success_count')
+        total_jobs=$(echo "$row" | jq -r '.total_jobs')
+
+        success_rate=$(awk "BEGIN {printf \"%.1f\", ($success_count/$total_jobs)*100}")
+
+        cat >> "$OUTPUT_FILE" <<TABLEROW
+                    <tr>
+                        <td>$timestamp</td>
+                        <td>${submission}s</td>
+                        <td>${execution}s</td>
+                        <td>${throughput} jobs/s</td>
+                        <td>${success_rate}%</td>
+                    </tr>
+TABLEROW
+    done
+
+    cat >> "$OUTPUT_FILE" <<'EOF'
+                </tbody>
+            </table>
+        </div>
+EOF
+fi
+
+cat >> "$OUTPUT_FILE" <<EOF
 
         <div class="section">
             <h2 class="section-title">Performance Metrics</h2>
@@ -775,8 +1023,155 @@ cat >> "$OUTPUT_FILE" <<'EOF'
     </div>
 
     <script>
+        // Historical data from server
+        const historicalData = $HISTORICAL_DATA;
+
         // Set generation date
         document.getElementById('gen-date').textContent = new Date().toLocaleString();
+
+        // Function to create SVG line chart
+        function createLineChart(svgId, data, color, label, maxY = null) {
+            const svg = document.getElementById(svgId);
+            if (!svg || !data || data.length === 0) return;
+
+            const width = svg.clientWidth || 800;
+            const height = svg.clientHeight || 250;
+            const padding = {top: 20, right: 30, bottom: 30, left: 60};
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            svg.setAttribute('viewBox', \`0 0 \${width} \${height}\`);
+
+            // Calculate scales
+            const minVal = Math.min(...data);
+            const maxVal = maxY !== null ? maxY : Math.max(...data);
+            const range = maxVal - (maxY !== null ? 0 : minVal);
+
+            // Draw grid lines
+            const gridLines = 5;
+            for (let i = 0; i <= gridLines; i++) {
+                const y = padding.top + (chartHeight / gridLines) * i;
+                const gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                gridLine.setAttribute('x1', padding.left);
+                gridLine.setAttribute('y1', y);
+                gridLine.setAttribute('x2', width - padding.right);
+                gridLine.setAttribute('y2', y);
+                gridLine.setAttribute('stroke', '#ecf0f1');
+                gridLine.setAttribute('stroke-width', '1');
+                svg.appendChild(gridLine);
+
+                // Y-axis labels
+                const labelValue = maxVal - (range / gridLines) * i;
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', padding.left - 10);
+                text.setAttribute('y', y + 5);
+                text.setAttribute('text-anchor', 'end');
+                text.setAttribute('fill', '#7f8c8d');
+                text.setAttribute('font-size', '12');
+                text.textContent = labelValue.toFixed(1);
+                svg.appendChild(text);
+            }
+
+            // Create path for line
+            let pathData = '';
+            data.forEach((value, index) => {
+                const x = padding.left + (chartWidth / (data.length - 1)) * index;
+                const y = padding.top + chartHeight - ((value - (maxY !== null ? 0 : minVal)) / range) * chartHeight;
+
+                if (index === 0) {
+                    pathData += \`M \${x} \${y}\`;
+                } else {
+                    pathData += \` L \${x} \${y}\`;
+                }
+
+                // Add dot
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', '4');
+                circle.setAttribute('fill', color);
+                svg.appendChild(circle);
+            });
+
+            // Add the line path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathData);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', '2');
+            svg.insertBefore(path, svg.firstChild);
+
+            // Add area fill
+            const areaData = pathData + \` L \${width - padding.right} \${padding.top + chartHeight} L \${padding.left} \${padding.top + chartHeight} Z\`;
+            const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            area.setAttribute('d', areaData);
+            area.setAttribute('fill', color);
+            area.setAttribute('fill-opacity', '0.1');
+            svg.insertBefore(area, svg.firstChild);
+        }
+
+        // Function to calculate stats
+        function calculateStats(data, label, unit) {
+            if (!data || data.length === 0) return '';
+
+            const latest = data[data.length - 1];
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+
+            // Calculate trend
+            let trend = 'stable';
+            let trendSymbol = '→';
+            let trendClass = 'trend-stable';
+
+            if (data.length >= 2) {
+                const recent = data.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, data.length);
+                const older = data.slice(0, -3).reduce((a, b) => a + b, 0) / (data.length - Math.min(3, data.length));
+
+                if (recent > older * 1.1) {
+                    trend = 'increasing';
+                    trendSymbol = '↑';
+                    trendClass = 'trend-up';
+                } else if (recent < older * 0.9) {
+                    trend = 'decreasing';
+                    trendSymbol = '↓';
+                    trendClass = 'trend-down';
+                }
+            }
+
+            return \`<p style="margin-top: 10px; color: #7f8c8d;">
+                <strong>Latest:</strong> \${latest.toFixed(1)}\${unit} |
+                <strong>Avg:</strong> \${avg.toFixed(1)}\${unit} |
+                <strong>Min:</strong> \${min.toFixed(1)}\${unit} |
+                <strong>Max:</strong> \${max.toFixed(1)}\${unit} |
+                <strong class="\${trendClass}">Trend: \${trend} \${trendSymbol}</strong>
+            </p>\`;
+        }
+
+        // Initialize trend charts
+        function initTrendCharts() {
+            if (!historicalData || historicalData.length === 0) {
+                return;
+            }
+
+            const submissionTimes = historicalData.map(d => d.submission_time);
+            const executionTimes = historicalData.map(d => d.execution_time);
+            const throughputs = historicalData.map(d => d.throughput);
+            const successRates = historicalData.map(d => {
+                return d.total_jobs > 0 ? (d.success_count / d.total_jobs * 100) : 0;
+            });
+
+            createLineChart('submissionChart', submissionTimes, 'rgb(52, 152, 219)', 'Submission Time');
+            createLineChart('executionChart', executionTimes, 'rgb(155, 89, 182)', 'Execution Time');
+            createLineChart('throughputChart', throughputs, 'rgb(230, 126, 34)', 'Throughput');
+            createLineChart('successRateChart', successRates, 'rgb(46, 204, 113)', 'Success Rate', 100);
+
+            // Add stats
+            document.getElementById('submissionStats').innerHTML = calculateStats(submissionTimes, 'Submission Time', 's');
+            document.getElementById('executionStats').innerHTML = calculateStats(executionTimes, 'Execution Time', 's');
+            document.getElementById('throughputStats').innerHTML = calculateStats(throughputs, 'Throughput', ' jobs/s');
+            document.getElementById('successStats').innerHTML = calculateStats(successRates, 'Success Rate', '%');
+        }
 
         // Filter logs
         function filterLogs(filter) {
@@ -799,7 +1194,7 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             });
         }
 
-        // Animate progress bars on load
+        // Animate progress bars and init charts on load
         window.addEventListener('load', () => {
             document.querySelectorAll('.progress-bar-success, .progress-bar-fail').forEach(bar => {
                 const width = bar.style.width;
@@ -808,6 +1203,9 @@ cat >> "$OUTPUT_FILE" <<'EOF'
                     bar.style.width = width;
                 }, 100);
             });
+
+            // Initialize trend charts
+            initTrendCharts();
         });
     </script>
 </body>

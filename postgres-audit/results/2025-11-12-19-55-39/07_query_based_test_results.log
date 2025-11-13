@@ -1,0 +1,153 @@
+Timing is on.
+
+=========================================
+Testing Query-Based Indexes
+=========================================
+Configuration:
+  MAX_QUERIES:  100
+  MIN_CALLS:  50
+  MIN_AVG_TIME_MS:  0.5
+
+
+--- Top Queries by Call Count ---
+ calls | avg_ms | total_ms |                                  query_preview                                   
+-------+--------+----------+----------------------------------------------------------------------------------
+  1400 |   1.55 |  2166.19 | SELECT contents FROM xs_item_cache WHERE elementName=$1 AND ids=$2
+   758 |   0.88 |   666.13 | select preference0_.id as id1_64_, preference0_.created as created2_64_, prefere
+   200 |  71.21 | 14241.27 | SELECT *             FROM test_fk_index(                                        +
+       |        |          |                 fk.table_name,                                                  +
+       |        |          |         
+   110 |   0.96 |   105.50 | SELECT session_id, ip_address FROM xdat_user_login WHERE session_id IN ($1,$2,$3
+   100 |   1.80 |   180.43 | SELECT COUNT(*) FROM xhbm_container_entity WHERE parent_container_entity IS NOT 
+   100 |   0.55 |    54.99 | SELECT COUNT(*) FROM xhbm_timed_event_status_entity WHERE subscription_delivery_
+   100 |   2.60 |   260.43 | SELECT COUNT(*) FROM xhbm_container_entity_mount WHERE container_entity IS NOT N
+   100 |   1.79 |   178.68 | SELECT COUNT(*) FROM xhbm_container_entity_output WHERE container_entity IS NOT 
+   100 |   8.64 |   864.28 | SELECT COUNT(*) FROM xhbm_container_entity_history WHERE container_entity IS NOT
+    92 | 137.98 | 12694.37 | SELECT *                             FROM test_large_table_index(               +
+       |        |          |               
+    90 |   1.26 |   112.96 | SELECT COUNT(*) FROM xhbm_container_entity_log_paths WHERE container_entity IS N
+    80 |   0.51 |    40.86 | SELECT * FROM xhbm_container_entity_log_paths WHERE container_entity = $1
+    80 |  23.26 |  1860.74 | SELECT * FROM xdat_change_info WHERE change_date > NOW() - INTERVAL $1 ORDER BY 
+    80 |   2.59 |   207.52 | SELECT * FROM xhbm_dicom_spatial_data WHERE series_uid = $1 ORDER BY frame_numbe
+    80 |   4.48 |   358.28 | SELECT * FROM xdat_user_login WHERE logout_date IS NULL ORDER BY login_date DESC
+    74 |   1.66 |   122.87 | SELECT i_wrk_workflowData($1,$2,$3,$4,$5)
+    72 |   0.58 |    41.69 | SELECT column_name                                                              +
+       |        |          |             FROM information_schema.columns                                     +
+       |        |          |             WHERE
+    50 |   1.67 |    83.48 | SELECT * FROM xdat_user_login WHERE session_id IN ($1,$2,$3,$4,$5)
+(18 rows)
+
+Time: 8.193 ms
+
+--- Top Queries by Total Time ---
+ calls | avg_ms | total_ms |                                  query_preview                                   
+-------+--------+----------+----------------------------------------------------------------------------------
+   200 |  71.21 | 14241.27 | SELECT *             FROM test_fk_index(                                        +
+       |        |          |                 fk.table_name,                                                  +
+       |        |          |         
+    92 | 137.98 | 12694.37 | SELECT *                             FROM test_large_table_index(               +
+       |        |          |               
+  1400 |   1.55 |  2166.19 | SELECT contents FROM xs_item_cache WHERE elementName=$1 AND ids=$2
+    80 |  23.26 |  1860.74 | SELECT * FROM xdat_change_info WHERE change_date > NOW() - INTERVAL $1 ORDER BY 
+   100 |   8.64 |   864.28 | SELECT COUNT(*) FROM xhbm_container_entity_history WHERE container_entity IS NOT
+   758 |   0.88 |   666.13 | select preference0_.id as id1_64_, preference0_.created as created2_64_, prefere
+    80 |   4.48 |   358.28 | SELECT * FROM xdat_user_login WHERE logout_date IS NULL ORDER BY login_date DESC
+   100 |   2.60 |   260.43 | SELECT COUNT(*) FROM xhbm_container_entity_mount WHERE container_entity IS NOT N
+    80 |   2.59 |   207.52 | SELECT * FROM xhbm_dicom_spatial_data WHERE series_uid = $1 ORDER BY frame_numbe
+   100 |   1.80 |   180.43 | SELECT COUNT(*) FROM xhbm_container_entity WHERE parent_container_entity IS NOT 
+   100 |   1.79 |   178.68 | SELECT COUNT(*) FROM xhbm_container_entity_output WHERE container_entity IS NOT 
+    74 |   1.66 |   122.87 | SELECT i_wrk_workflowData($1,$2,$3,$4,$5)
+    90 |   1.26 |   112.96 | SELECT COUNT(*) FROM xhbm_container_entity_log_paths WHERE container_entity IS N
+   110 |   0.96 |   105.50 | SELECT session_id, ip_address FROM xdat_user_login WHERE session_id IN ($1,$2,$3
+    50 |   1.67 |    83.48 | SELECT * FROM xdat_user_login WHERE session_id IN ($1,$2,$3,$4,$5)
+   100 |   0.55 |    54.99 | SELECT COUNT(*) FROM xhbm_timed_event_status_entity WHERE subscription_delivery_
+    72 |   0.58 |    41.69 | SELECT column_name                                                              +
+       |        |          |             FROM information_schema.columns                                     +
+       |        |          |             WHERE
+    80 |   0.51 |    40.86 | SELECT * FROM xhbm_container_entity_log_paths WHERE container_entity = $1
+(18 rows)
+
+Time: 4.142 ms
+
+=========================================
+Testing Specific Query Patterns
+=========================================
+
+CREATE FUNCTION
+Time: 5.818 ms
+Test function created
+
+
+=========================================
+Test 1: xs_item_cache (elementName, ids)
+=========================================
+Query pattern: SELECT contents FROM xs_item_cache WHERE elementName=$1 AND ids=$2
+Calls: 1,284 | Avg: 1.63ms
+
+psql:/tmp/test_query_based_indexes.sql:179: NOTICE:  Baseline: 0.53180000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:179: NOTICE:  Index created: idx_test_query_item_cache_element_ids(elementName, ids)
+psql:/tmp/test_query_based_indexes.sql:179: NOTICE:  With index: 0.35000000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:179: NOTICE:  KEEP - improved by 34.19.2f%
+DO
+Time: 46.234 ms
+
+=========================================
+Test 2: xnat_imagesessiondata_history
+=========================================
+Query pattern: WHERE id = $1 AND change_date IS NOT NULL
+Calls: 1,107 | Avg: 0.09ms
+
+psql:/tmp/test_query_based_indexes.sql:208: NOTICE:  Baseline: 0.49020000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:208: NOTICE:  Index created: idx_test_query_imagesession_history(id, change_date)
+psql:/tmp/test_query_based_indexes.sql:208: NOTICE:  With index: 0.47020000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:208: NOTICE:  ROLLBACK - only improved by 4.08.2f%
+DO
+Time: 27.573 ms
+
+=========================================
+Test 3: xhbm_preference
+=========================================
+Query pattern: Complex WHERE clauses
+Calls: 7,162 | Avg: 0.08ms
+
+psql:/tmp/test_query_based_indexes.sql:237: NOTICE:  Baseline: 0.21680000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:237: NOTICE:  Index created: idx_test_query_preference_tool_name(tool, name)
+psql:/tmp/test_query_based_indexes.sql:237: NOTICE:  With index: 0.32920000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:237: NOTICE:  ROLLBACK - only improved by -51.85.2f%
+DO
+Time: 20.298 ms
+
+=========================================
+Test 4: xdat_user_login (session_id)
+=========================================
+Query pattern: WHERE session_id IN (...)
+
+psql:/tmp/test_query_based_indexes.sql:266: NOTICE:  Baseline: 3.5990000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:266: NOTICE:  Index created: idx_test_query_user_login_session(session_id)
+psql:/tmp/test_query_based_indexes.sql:266: NOTICE:  With index: 0.68460000000000000000.2f ms
+psql:/tmp/test_query_based_indexes.sql:266: NOTICE:  KEEP - improved by 80.98.2f%
+DO
+Time: 142.392 ms
+
+=========================================
+SUMMARY
+=========================================
+
+ tables_tested | indexes_tested | kept | rolled_back | avg_improvement_pct 
+---------------+----------------+------+-------------+---------------------
+             4 |              4 |    2 |           2 |               57.59
+(1 row)
+
+Time: 2.825 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+   table_name    |              index_name               |            columns            | improvement_pct 
+-----------------+---------------------------------------+-------------------------------+-----------------
+ xdat_user_login | idx_test_query_user_login_session     | Query-based: session_id       |           80.98
+ xs_item_cache   | idx_test_query_item_cache_element_ids | Query-based: elementName, ids |           34.19
+(2 rows)
+
+Time: 0.945 ms
+
+Results saved in pg_index_test_log table
+

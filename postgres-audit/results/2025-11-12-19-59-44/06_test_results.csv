@@ -1,0 +1,115 @@
+test_timestamp,table_name,index_name,test_phase,execution_time_ms,decision,improvement_percent,notes
+2025-11-13 00:59:49.425905,xdat_change_info,idx_test_change_info_date,baseline,41.0044000000000000,,,Columns: change_date DESC
+2025-11-13 00:59:49.425905,xdat_change_info,idx_test_change_info_date,with_index,0.66960000000000000000,,,Columns: change_date DESC
+2025-11-13 00:59:49.425905,xdat_change_info,idx_test_change_info_date,decision,0.66960000000000000000,KEEP,98.37,Schema-based index
+2025-11-13 00:59:50.18901,xhbm_container_entity_log_paths,idx_test_log_paths_container,baseline,1.5202000000000000,,,Columns: container_entity
+2025-11-13 00:59:50.18901,xhbm_container_entity_log_paths,idx_test_log_paths_container,with_index,0.26120000000000000000,,,Columns: container_entity
+2025-11-13 00:59:50.18901,xhbm_container_entity_log_paths,idx_test_log_paths_container,decision,0.26120000000000000000,KEEP,82.82,Schema-based index
+2025-11-13 00:59:50.336301,xhbm_dicom_spatial_data,idx_test_dicom_series,baseline,6.6494000000000000,,,"Columns: series_uid, frame_number"
+2025-11-13 00:59:50.336301,xhbm_dicom_spatial_data,idx_test_dicom_series,with_index,0.53660000000000000000,,,"Columns: series_uid, frame_number"
+2025-11-13 00:59:50.336301,xhbm_dicom_spatial_data,idx_test_dicom_series,decision,0.53660000000000000000,KEEP,91.93,Schema-based index
+2025-11-13 00:59:50.869783,xdat_user_login,idx_test_user_login_active,baseline,5.5966000000000000,,,"Columns: user_xdat_user_id, login_date DESC"
+2025-11-13 00:59:50.869783,xdat_user_login,idx_test_user_login_active,with_index,4.7216000000000000,,,"Columns: user_xdat_user_id, login_date DESC"
+2025-11-13 00:59:50.869783,xdat_user_login,idx_test_user_login_active,decision,4.7216000000000000,KEEP,15.63,Schema-based index
+2025-11-13 00:59:51.091675,xnat_resource,idx_test_resource_format,baseline,1.4614000000000000,,,Columns: format
+2025-11-13 00:59:51.091675,xnat_resource,idx_test_resource_format,with_index,0.28380000000000000000,,,Columns: format
+2025-11-13 00:59:51.091675,xnat_resource,idx_test_resource_format,decision,0.28380000000000000000,KEEP,80.58,Schema-based index
+2025-11-13 00:59:51.155034,xnat_imagescandata,idx_test_imagescan_modality,baseline,1.9882000000000000,,,Columns: modality
+2025-11-13 00:59:51.155034,xnat_imagescandata,idx_test_imagescan_modality,with_index,0.51980000000000000000,,,Columns: modality
+2025-11-13 00:59:51.155034,xnat_imagescandata,idx_test_imagescan_modality,decision,0.51980000000000000000,KEEP,73.86,Schema-based index
+2025-11-13 00:59:51.228915,xnat_imagescandata,idx_test_imagescan_uid,baseline,1.03300000000000000000,,,Columns: uid
+2025-11-13 00:59:51.228915,xnat_imagescandata,idx_test_imagescan_uid,with_index,0.79400000000000000000,,,Columns: uid
+2025-11-13 00:59:51.228915,xnat_imagescandata,idx_test_imagescan_uid,decision,0.79400000000000000000,KEEP,23.14,Schema-based index
+2025-11-13 00:59:52.016016,xdat_change_info,idx_test_large_xdat_change_info_change_user,baseline,0.27780000000000000000,,,Column: change_user
+2025-11-13 00:59:52.016016,xdat_change_info,idx_test_large_xdat_change_info_change_user,with_index,0.22600000000000000000,,,Column: change_user
+2025-11-13 00:59:52.016016,xdat_change_info,idx_test_large_xdat_change_info_change_user,decision,0.22600000000000000000,KEEP,18.65,Column: change_user
+2025-11-13 00:59:52.016016,xhbm_container_entity_input,idx_test_large_xhbm_container_entity_input_name,baseline,0.35940000000000000000,,,Column: name
+2025-11-13 00:59:52.016016,xhbm_container_entity_input,idx_test_large_xhbm_container_entity_input_name,with_index,0.49000000000000000000,,,Column: name
+2025-11-13 00:59:52.016016,xhbm_container_entity_input,idx_test_large_xhbm_container_entity_input_name,decision,0.49000000000000000000,ROLLBACK,-36.34,Column: name
+2025-11-13 00:59:52.016016,xhbm_container_entity_history,idx_test_large_xhbm_container_entity_history_entity_id,baseline,0.28560000000000000000,,,Column: entity_id
+2025-11-13 00:59:52.016016,xhbm_container_entity_history,idx_test_large_xhbm_container_entity_history_entity_id,with_index,0.38760000000000000000,,,Column: entity_id
+2025-11-13 00:59:52.016016,xhbm_container_entity_history,idx_test_large_xhbm_container_entity_history_entity_id,decision,0.38760000000000000000,ROLLBACK,-35.71,Column: entity_id
+2025-11-13 00:59:52.016016,wrk_workflowdata,idx_test_large_wrk_workflowdata_comments,baseline,3.2462000000000000,,,Column: comments
+2025-11-13 00:59:52.016016,wrk_workflowdata,idx_test_large_wrk_workflowdata_comments,with_index,0.52580000000000000000,,,Column: comments
+2025-11-13 00:59:52.016016,wrk_workflowdata,idx_test_large_wrk_workflowdata_comments,decision,0.52580000000000000000,KEEP,83.80,Column: comments
+2025-11-13 00:59:52.016016,xdat_user_login,idx_test_large_xdat_user_login_login_date,baseline,2.3824000000000000,,,Column: login_date
+2025-11-13 00:59:52.016016,xdat_user_login,idx_test_large_xdat_user_login_login_date,with_index,0.34840000000000000000,,,Column: login_date
+2025-11-13 00:59:52.016016,xdat_user_login,idx_test_large_xdat_user_login_login_date,decision,0.34840000000000000000,KEEP,85.38,Column: login_date
+2025-11-13 00:59:52.016016,xdat_user_login_meta_data,idx_test_large_xdat_user_login_meta_data_xft_version,baseline,3.2810000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xdat_user_login_meta_data,idx_test_large_xdat_user_login_meta_data_xft_version,with_index,0.42900000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xdat_user_login_meta_data,idx_test_large_xdat_user_login_meta_data_xft_version,decision,0.42900000000000000000,KEEP,86.92,Column: xft_version
+2025-11-13 00:59:52.016016,xhbm_dicom_spatial_data,idx_test_large_xhbm_dicom_spatial_data_created,baseline,2.7700000000000000,,,Column: created
+2025-11-13 00:59:52.016016,xhbm_dicom_spatial_data,idx_test_large_xhbm_dicom_spatial_data_created,with_index,0.43780000000000000000,,,Column: created
+2025-11-13 00:59:52.016016,xhbm_dicom_spatial_data,idx_test_large_xhbm_dicom_spatial_data_created,decision,0.43780000000000000000,KEEP,84.19,Column: created
+2025-11-13 00:59:52.016016,wrk_workflowdata_meta_data,idx_test_large_wrk_workflowdata_meta_data_xft_version,baseline,2.8302000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,wrk_workflowdata_meta_data,idx_test_large_wrk_workflowdata_meta_data_xft_version,with_index,0.43100000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,wrk_workflowdata_meta_data,idx_test_large_wrk_workflowdata_meta_data_xft_version,decision,0.43100000000000000000,KEEP,84.77,Column: xft_version
+2025-11-13 00:59:52.016016,xhbm_container_entity_environment_variables,idx_test_large_xhbm_container_entity_environment_variables_environment_variables,baseline,6.0040000000000000,,,Column: environment_variables
+2025-11-13 00:59:52.016016,xhbm_container_entity_environment_variables,idx_test_large_xhbm_container_entity_environment_variables_environment_variables,with_index,0.35240000000000000000,,,Column: environment_variables
+2025-11-13 00:59:52.016016,xhbm_container_entity_environment_variables,idx_test_large_xhbm_container_entity_environment_variables_environment_variables,decision,0.35240000000000000000,KEEP,94.13,Column: environment_variables
+2025-11-13 00:59:52.016016,xhbm_container_entity,idx_test_large_xhbm_container_entity_created,baseline,2.4046000000000000,,,Column: created
+2025-11-13 00:59:52.016016,xhbm_container_entity,idx_test_large_xhbm_container_entity_created,with_index,0.58080000000000000000,,,Column: created
+2025-11-13 00:59:52.016016,xhbm_container_entity,idx_test_large_xhbm_container_entity_created,decision,0.58080000000000000000,KEEP,75.85,Column: created
+2025-11-13 00:59:52.016016,xnat_resource,idx_test_large_xnat_resource_uri,baseline,0.21700000000000000000,,,Column: uri
+2025-11-13 00:59:52.016016,xnat_resource,idx_test_large_xnat_resource_uri,with_index,0.42640000000000000000,,,Column: uri
+2025-11-13 00:59:52.016016,xnat_resource,idx_test_large_xnat_resource_uri,decision,0.42640000000000000000,ROLLBACK,-96.50,Column: uri
+2025-11-13 00:59:52.016016,xhbm_container_entity_container_labels,idx_test_large_xhbm_container_entity_container_labels_container_labels,baseline,0.50440000000000000000,,,Column: container_labels
+2025-11-13 00:59:52.016016,xhbm_container_entity_container_labels,idx_test_large_xhbm_container_entity_container_labels_container_labels,with_index,0.26760000000000000000,,,Column: container_labels
+2025-11-13 00:59:52.016016,xhbm_container_entity_container_labels,idx_test_large_xhbm_container_entity_container_labels_container_labels,decision,0.26760000000000000000,KEEP,46.95,Column: container_labels
+2025-11-13 00:59:52.016016,xhbm_container_entity_mount,idx_test_large_xhbm_container_entity_mount_container_host_path,baseline,2.7368000000000000,,,Column: container_host_path
+2025-11-13 00:59:52.016016,xhbm_container_entity_mount,idx_test_large_xhbm_container_entity_mount_container_host_path,with_index,0.52300000000000000000,,,Column: container_host_path
+2025-11-13 00:59:52.016016,xhbm_container_entity_mount,idx_test_large_xhbm_container_entity_mount_container_host_path,decision,0.52300000000000000000,KEEP,80.89,Column: container_host_path
+2025-11-13 00:59:52.016016,xnat_resourcecatalog_meta_data,idx_test_large_xnat_resourcecatalog_meta_data_xft_version,baseline,1.7878000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_resourcecatalog_meta_data,idx_test_large_xnat_resourcecatalog_meta_data_xft_version,with_index,0.48560000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_resourcecatalog_meta_data,idx_test_large_xnat_resourcecatalog_meta_data_xft_version,decision,0.48560000000000000000,KEEP,72.84,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_abstractresource_meta_data,idx_test_large_xnat_abstractresource_meta_data_xft_version,baseline,1.5776000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_abstractresource_meta_data,idx_test_large_xnat_abstractresource_meta_data_xft_version,with_index,0.42940000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_abstractresource_meta_data,idx_test_large_xnat_abstractresource_meta_data_xft_version,decision,0.42940000000000000000,KEEP,72.78,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_resource_meta_data,idx_test_large_xnat_resource_meta_data_xft_version,baseline,1.5330000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_resource_meta_data,idx_test_large_xnat_resource_meta_data_xft_version,with_index,0.47580000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_resource_meta_data,idx_test_large_xnat_resource_meta_data_xft_version,decision,0.47580000000000000000,KEEP,68.96,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_abstractresource,idx_test_large_xnat_abstractresource_label,baseline,0.27820000000000000000,,,Column: label
+2025-11-13 00:59:52.016016,xnat_abstractresource,idx_test_large_xnat_abstractresource_label,with_index,0.34540000000000000000,,,Column: label
+2025-11-13 00:59:52.016016,xnat_abstractresource,idx_test_large_xnat_abstractresource_label,decision,0.34540000000000000000,ROLLBACK,-24.16,Column: label
+2025-11-13 00:59:52.016016,xnat_resourcecatalog,idx_test_large_xnat_resourcecatalog_resourcecatalog_info,baseline,0.41380000000000000000,,,Column: resourcecatalog_info
+2025-11-13 00:59:52.016016,xnat_resourcecatalog,idx_test_large_xnat_resourcecatalog_resourcecatalog_info,with_index,0.18860000000000000000,,,Column: resourcecatalog_info
+2025-11-13 00:59:52.016016,xnat_resourcecatalog,idx_test_large_xnat_resourcecatalog_resourcecatalog_info,decision,0.18860000000000000000,KEEP,54.42,Column: resourcecatalog_info
+2025-11-13 00:59:52.016016,xs_item_cache,idx_test_large_xs_item_cache_elementname,baseline,0.54660000000000000000,,,Column: elementname
+2025-11-13 00:59:52.016016,xs_item_cache,idx_test_large_xs_item_cache_elementname,with_index,0.37880000000000000000,,,Column: elementname
+2025-11-13 00:59:52.016016,xs_item_cache,idx_test_large_xs_item_cache_elementname,decision,0.37880000000000000000,KEEP,30.70,Column: elementname
+2025-11-13 00:59:52.016016,xnat_addfield,idx_test_large_xnat_addfield_addfield,baseline,0.68520000000000000000,,,Column: addfield
+2025-11-13 00:59:52.016016,xnat_addfield,idx_test_large_xnat_addfield_addfield,with_index,0.66660000000000000000,,,Column: addfield
+2025-11-13 00:59:52.016016,xnat_addfield,idx_test_large_xnat_addfield_addfield,decision,0.66660000000000000000,ROLLBACK,2.71,Column: addfield
+2025-11-13 00:59:52.016016,xnat_imagescandata,idx_test_large_xnat_imagescandata_image_session_id,baseline,0.45360000000000000000,,,Column: image_session_id
+2025-11-13 00:59:52.016016,xnat_imagescandata,idx_test_large_xnat_imagescandata_image_session_id,with_index,0.52960000000000000000,,,Column: image_session_id
+2025-11-13 00:59:52.016016,xnat_imagescandata,idx_test_large_xnat_imagescandata_image_session_id,decision,0.52960000000000000000,ROLLBACK,-16.75,Column: image_session_id
+2025-11-13 00:59:52.016016,xhbm_container_entity_log_paths,idx_test_large_xhbm_container_entity_log_paths_container_entity,baseline,1.07060000000000000000,,,Column: container_entity
+2025-11-13 00:59:52.016016,xhbm_container_entity_log_paths,idx_test_large_xhbm_container_entity_log_paths_container_entity,with_index,0.28560000000000000000,,,Column: container_entity
+2025-11-13 00:59:52.016016,xhbm_container_entity_log_paths,idx_test_large_xhbm_container_entity_log_paths_container_entity,decision,0.28560000000000000000,KEEP,73.32,Column: container_entity
+2025-11-13 00:59:52.016016,xnat_imagescandata_meta_data,idx_test_large_xnat_imagescandata_meta_data_xft_version,baseline,1.03220000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_imagescandata_meta_data,idx_test_large_xnat_imagescandata_meta_data_xft_version,with_index,0.48580000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_imagescandata_meta_data,idx_test_large_xnat_imagescandata_meta_data_xft_version,decision,0.48580000000000000000,KEEP,52.94,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_experimentdata,idx_test_large_xnat_experimentdata_date,baseline,0.55540000000000000000,,,Column: date
+2025-11-13 00:59:52.016016,xnat_experimentdata,idx_test_large_xnat_experimentdata_date,with_index,0.96020000000000000000,,,Column: date
+2025-11-13 00:59:52.016016,xnat_experimentdata,idx_test_large_xnat_experimentdata_date,decision,0.96020000000000000000,ROLLBACK,-72.88,Column: date
+2025-11-13 00:59:52.016016,xnat_ctscandata,idx_test_large_xnat_ctscandata_parameters_voxelres_x,baseline,4.0478000000000000,,,Column: parameters_voxelres_x
+2025-11-13 00:59:52.016016,xnat_ctscandata,idx_test_large_xnat_ctscandata_parameters_voxelres_x,with_index,0.75060000000000000000,,,Column: parameters_voxelres_x
+2025-11-13 00:59:52.016016,xnat_ctscandata,idx_test_large_xnat_ctscandata_parameters_voxelres_x,decision,0.75060000000000000000,KEEP,81.46,Column: parameters_voxelres_x
+2025-11-13 00:59:52.016016,xdat_field_mapping,idx_test_large_xdat_field_mapping_field,baseline,0.48540000000000000000,,,Column: field
+2025-11-13 00:59:52.016016,xdat_field_mapping,idx_test_large_xdat_field_mapping_field,with_index,0.55160000000000000000,,,Column: field
+2025-11-13 00:59:52.016016,xdat_field_mapping,idx_test_large_xdat_field_mapping_field,decision,0.55160000000000000000,ROLLBACK,-13.64,Column: field
+2025-11-13 00:59:52.016016,xnat_ctscandata_meta_data,idx_test_large_xnat_ctscandata_meta_data_xft_version,baseline,0.79020000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_ctscandata_meta_data,idx_test_large_xnat_ctscandata_meta_data_xft_version,with_index,0.45660000000000000000,,,Column: xft_version
+2025-11-13 00:59:52.016016,xnat_ctscandata_meta_data,idx_test_large_xnat_ctscandata_meta_data_xft_version,decision,0.45660000000000000000,KEEP,42.22,Column: xft_version
+2025-11-13 00:59:58.113504,xs_item_cache,idx_test_query_item_cache_element_ids,baseline,0.46240000000000000000,,,"Query-based: elementName, ids"
+2025-11-13 00:59:58.113504,xs_item_cache,idx_test_query_item_cache_element_ids,with_index,0.38000000000000000000,,,"Query-based: elementName, ids"
+2025-11-13 00:59:58.113504,xs_item_cache,idx_test_query_item_cache_element_ids,decision,0.38000000000000000000,KEEP,17.82,"Query-based: elementName, ids"
+2025-11-13 00:59:58.150986,xnat_imagesessiondata_history,idx_test_query_imagesession_history,baseline,0.49820000000000000000,,,"Query-based: id, change_date"
+2025-11-13 00:59:58.150986,xnat_imagesessiondata_history,idx_test_query_imagesession_history,with_index,0.51460000000000000000,,,"Query-based: id, change_date"
+2025-11-13 00:59:58.150986,xnat_imagesessiondata_history,idx_test_query_imagesession_history,decision,0.51460000000000000000,ROLLBACK,-3.29,"Query-based: id, change_date"
+2025-11-13 00:59:58.198907,xhbm_preference,idx_test_query_preference_tool_name,baseline,0.20700000000000000000,,,"Query-based: tool, name"
+2025-11-13 00:59:58.198907,xhbm_preference,idx_test_query_preference_tool_name,with_index,0.30120000000000000000,,,"Query-based: tool, name"
+2025-11-13 00:59:58.198907,xhbm_preference,idx_test_query_preference_tool_name,decision,0.30120000000000000000,ROLLBACK,-45.51,"Query-based: tool, name"
+2025-11-13 00:59:58.216741,xdat_user_login,idx_test_query_user_login_session,baseline,3.3524000000000000,,,Query-based: session_id
+2025-11-13 00:59:58.216741,xdat_user_login,idx_test_query_user_login_session,with_index,0.66640000000000000000,,,Query-based: session_id
+2025-11-13 00:59:58.216741,xdat_user_login,idx_test_query_user_login_session,decision,0.66640000000000000000,KEEP,80.12,Query-based: session_id

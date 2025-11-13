@@ -1,0 +1,57 @@
+Timing is on.
+
+=========================================
+Testing Indexes for Large Tables
+=========================================
+Configuration:
+  MAX_TABLES:  200
+  MIN_SIZE_MB:  :MIN_SIZE_MB
+  MIN_SEQ_SCANS:  :MIN_SEQ_SCANS
+
+CREATE FUNCTION
+Time: 5.637 ms
+Test function created
+
+CREATE TABLE
+Time: 16.666 ms
+Time: 0.280 ms
+psql:/tmp/test_large_tables.sql:147: ERROR:  syntax error at or near ":"
+LINE 4:     COALESCE(NULLIF(:'MIN_SIZE_MB', ''), '1')::INT,
+                            ^
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing Top <NULL> Largest Tables
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Completed testing 0 tables
+DO
+Time: 15.754 ms
+
+=========================================
+SUMMARY
+=========================================
+
+ tables_tested | indexes_tested | kept | rolled_back | avg_improvement_pct | max_improvement_pct 
+---------------+----------------+------+-------------+---------------------+---------------------
+             0 |              0 |    0 |           0 |                     |                    
+(1 row)
+
+Time: 4.197 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+ table_name | index_name | column_indexed | improvement_pct 
+------------+------------+----------------+-----------------
+(0 rows)
+
+Time: 1.232 ms
+
+--- ROLLED BACK (<5% improvement) ---
+ table_name | index_name | column_indexed | improvement_pct 
+------------+------------+----------------+-----------------
+(0 rows)
+
+Time: 0.505 ms
+
+Results saved in pg_index_test_log table
+

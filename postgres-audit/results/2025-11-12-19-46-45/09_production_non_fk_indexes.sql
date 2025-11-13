@@ -1,0 +1,11 @@
+-- Non-FK Indexes (from test results)
+ CREATE INDEX IF NOT EXISTS idx_change_info_date ON xdat_change_info(...);  -- 99.00% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_dicom_series ON xhbm_dicom_spatial_data(...);  -- 88.18% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_query_user_login_session ON xdat_user_login(...);  -- 86.45% improvement (Query-based: session_id)
+ CREATE INDEX IF NOT EXISTS idx_log_paths_container ON xhbm_container_entity_log_paths(...);  -- 74.29% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_imagescan_modality ON xnat_imagescandata(...);  -- 70.15% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_resource_format ON xnat_resource(...);  -- 66.59% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_query_item_cache_element_ids ON xs_item_cache(...);  -- 55.63% improvement (Query-based: elementName, ids)
+ CREATE INDEX IF NOT EXISTS idx_imagescan_uid ON xnat_imagescandata(...);  -- 43.90% improvement (Schema-based index)
+ CREATE INDEX IF NOT EXISTS idx_user_login_active ON xdat_user_login(...);  -- 13.72% improvement (Schema-based index)
+

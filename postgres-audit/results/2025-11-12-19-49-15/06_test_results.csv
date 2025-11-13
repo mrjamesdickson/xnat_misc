@@ -1,0 +1,34 @@
+test_timestamp,table_name,index_name,test_phase,execution_time_ms,decision,improvement_percent,notes
+2025-11-13 00:49:20.148116,xdat_change_info,idx_test_change_info_date,baseline,45.0806000000000000,,,Columns: change_date DESC
+2025-11-13 00:49:20.148116,xdat_change_info,idx_test_change_info_date,with_index,0.48860000000000000000,,,Columns: change_date DESC
+2025-11-13 00:49:20.148116,xdat_change_info,idx_test_change_info_date,decision,0.48860000000000000000,KEEP,98.92,Schema-based index
+2025-11-13 00:49:20.985428,xhbm_container_entity_log_paths,idx_test_log_paths_container,baseline,1.05440000000000000000,,,Columns: container_entity
+2025-11-13 00:49:20.985428,xhbm_container_entity_log_paths,idx_test_log_paths_container,with_index,0.25960000000000000000,,,Columns: container_entity
+2025-11-13 00:49:20.985428,xhbm_container_entity_log_paths,idx_test_log_paths_container,decision,0.25960000000000000000,KEEP,75.38,Schema-based index
+2025-11-13 00:49:21.074604,xhbm_dicom_spatial_data,idx_test_dicom_series,baseline,4.7944000000000000,,,"Columns: series_uid, frame_number"
+2025-11-13 00:49:21.074604,xhbm_dicom_spatial_data,idx_test_dicom_series,with_index,0.64060000000000000000,,,"Columns: series_uid, frame_number"
+2025-11-13 00:49:21.074604,xhbm_dicom_spatial_data,idx_test_dicom_series,decision,0.64060000000000000000,KEEP,86.64,Schema-based index
+2025-11-13 00:49:21.610982,xdat_user_login,idx_test_user_login_active,baseline,5.6416000000000000,,,"Columns: user_xdat_user_id, login_date DESC"
+2025-11-13 00:49:21.610982,xdat_user_login,idx_test_user_login_active,with_index,4.7102000000000000,,,"Columns: user_xdat_user_id, login_date DESC"
+2025-11-13 00:49:21.610982,xdat_user_login,idx_test_user_login_active,decision,4.7102000000000000,KEEP,16.51,Schema-based index
+2025-11-13 00:49:21.811335,xnat_resource,idx_test_resource_format,baseline,1.2556000000000000,,,Columns: format
+2025-11-13 00:49:21.811335,xnat_resource,idx_test_resource_format,with_index,0.27820000000000000000,,,Columns: format
+2025-11-13 00:49:21.811335,xnat_resource,idx_test_resource_format,decision,0.27820000000000000000,KEEP,77.84,Schema-based index
+2025-11-13 00:49:21.875033,xnat_imagescandata,idx_test_imagescan_modality,baseline,1.4746000000000000,,,Columns: modality
+2025-11-13 00:49:21.875033,xnat_imagescandata,idx_test_imagescan_modality,with_index,0.49260000000000000000,,,Columns: modality
+2025-11-13 00:49:21.875033,xnat_imagescandata,idx_test_imagescan_modality,decision,0.49260000000000000000,KEEP,66.59,Schema-based index
+2025-11-13 00:49:21.940168,xnat_imagescandata,idx_test_imagescan_uid,baseline,1.05460000000000000000,,,Columns: uid
+2025-11-13 00:49:21.940168,xnat_imagescandata,idx_test_imagescan_uid,with_index,0.53860000000000000000,,,Columns: uid
+2025-11-13 00:49:21.940168,xnat_imagescandata,idx_test_imagescan_uid,decision,0.53860000000000000000,KEEP,48.93,Schema-based index
+2025-11-13 00:49:23.782138,xs_item_cache,idx_test_query_item_cache_element_ids,baseline,0.70920000000000000000,,,"Query-based: elementName, ids"
+2025-11-13 00:49:23.782138,xs_item_cache,idx_test_query_item_cache_element_ids,with_index,0.26700000000000000000,,,"Query-based: elementName, ids"
+2025-11-13 00:49:23.782138,xs_item_cache,idx_test_query_item_cache_element_ids,decision,0.26700000000000000000,KEEP,62.35,"Query-based: elementName, ids"
+2025-11-13 00:49:23.81978,xnat_imagesessiondata_history,idx_test_query_imagesession_history,baseline,0.46580000000000000000,,,"Query-based: id, change_date"
+2025-11-13 00:49:23.81978,xnat_imagesessiondata_history,idx_test_query_imagesession_history,with_index,0.48940000000000000000,,,"Query-based: id, change_date"
+2025-11-13 00:49:23.81978,xnat_imagesessiondata_history,idx_test_query_imagesession_history,decision,0.48940000000000000000,ROLLBACK,-5.07,"Query-based: id, change_date"
+2025-11-13 00:49:23.847007,xhbm_preference,idx_test_query_preference_tool_name,baseline,0.20160000000000000000,,,"Query-based: tool, name"
+2025-11-13 00:49:23.847007,xhbm_preference,idx_test_query_preference_tool_name,with_index,0.32680000000000000000,,,"Query-based: tool, name"
+2025-11-13 00:49:23.847007,xhbm_preference,idx_test_query_preference_tool_name,decision,0.32680000000000000000,ROLLBACK,-62.10,"Query-based: tool, name"
+2025-11-13 00:49:23.867176,xdat_user_login,idx_test_query_user_login_session,baseline,3.5798000000000000,,,Query-based: session_id
+2025-11-13 00:49:23.867176,xdat_user_login,idx_test_query_user_login_session,with_index,0.59300000000000000000,,,Query-based: session_id
+2025-11-13 00:49:23.867176,xdat_user_login,idx_test_query_user_login_session,decision,0.59300000000000000000,KEEP,83.43,Query-based: session_id

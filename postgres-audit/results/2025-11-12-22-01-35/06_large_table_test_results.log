@@ -1,0 +1,338 @@
+Timing is on.
+
+=========================================
+Testing Indexes for Large Tables
+=========================================
+Configuration:
+  MAX_TABLES:  200
+  MIN_SIZE_MB:  1
+  MIN_SEQ_SCANS:  1
+
+CREATE FUNCTION
+Time: 13.138 ms
+Test function created
+
+CREATE TABLE
+Time: 18.584 ms
+INSERT 0 1
+Time: 7.773 ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing Top 200 Largest Tables
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 1/200: xdat_change_info (50 MB, 257442 rows, 309 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xdat_change_info_change_user on xdat_change_info.change_user
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.47380000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xdat_change_info_change_user
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.64580000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -36.30.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 2/200: xhbm_container_entity_input (14 MB, 122564 rows, 91 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_input_name on xhbm_container_entity_input.name
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.57980000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_input_name
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.56120000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by 3.21.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 3/200: xhbm_container_entity_history (14 MB, 96133 rows, 203 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_history_entity_id on xhbm_container_entity_history.entity_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.29740000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_history_entity_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.94420000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -217.48.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 4/200: wrk_workflowdata (13 MB, 33804 rows, 689 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped wrk_workflowdata - no data in column executionenvironment_wrk_abstractexecutionenvironment_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_wrk_workflowdata_comments on wrk_workflowdata.comments
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 5.2386000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_wrk_workflowdata_comments
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.65940000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 87.41.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 5/200: xdat_user_login (12 MB, 39903 rows, 2485 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xdat_user_login_login_date on xdat_user_login.login_date
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 3.5262000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xdat_user_login_login_date
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.91440000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 74.07.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 6/200: xdat_user_login_meta_data (11 MB, 39903 rows, 35 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xdat_user_login_meta_data_xft_version on xdat_user_login_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 5.6172000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xdat_user_login_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.04620000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 81.38.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 7/200: xhbm_dicom_spatial_data (11 MB, 25365 rows, 192 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_dicom_spatial_data_created on xhbm_dicom_spatial_data.created
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 5.5512000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_dicom_spatial_data_created
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.87260000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 84.28.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 8/200: wrk_workflowdata_meta_data (9424 kB, 34264 rows, 108 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_wrk_workflowdata_meta_data_xft_version on wrk_workflowdata_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 5.4154000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_wrk_workflowdata_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.38820000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 92.83.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 9/200: xhbm_container_entity_environment_variables (8944 kB, 75801 rows, 30 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_environment_variables_environment_variables on xhbm_container_entity_environment_variables.environment_variables
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 11.4472000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  identifier "idx_test_large_xhbm_container_entity_environment_variables_environment_variables" will be truncated to "idx_test_large_xhbm_container_entity_environment_variables_envi"
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_environment_variables_environment_variables
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.63000000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 94.50.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 10/200: xhbm_container_entity (6208 kB, 14682 rows, 188 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_created on xhbm_container_entity.created
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 5.3878000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_created
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.10480000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 79.49.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 11/200: xnat_resource (6192 kB, 11661 rows, 181 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xnat_resource - no data in column provenance_prov_process_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_resource_uri on xnat_resource.uri
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.65300000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_resource_uri
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.10180000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -68.73.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 12/200: xhbm_container_entity_container_labels (5712 kB, 52826 rows, 38 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_container_labels_container_labels on xhbm_container_entity_container_labels.container_labels
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.2038000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  identifier "idx_test_large_xhbm_container_entity_container_labels_container_labels" will be truncated to "idx_test_large_xhbm_container_entity_container_labels_container"
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_container_labels_container_labels
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.57040000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 52.62.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 13/200: xhbm_container_entity_mount (5624 kB, 27953 rows, 167 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_mount_container_host_path on xhbm_container_entity_mount.container_host_path
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 6.1284000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_mount_container_host_path
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.09920000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 82.06.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 14/200: xnat_resourcecatalog_meta_data (4328 kB, 14626 rows, 28 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_resourcecatalog_meta_data_xft_version on xnat_resourcecatalog_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 4.9362000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_resourcecatalog_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.83040000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 83.18.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 15/200: xnat_abstractresource_meta_data (4296 kB, 14626 rows, 28 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_abstractresource_meta_data_xft_version on xnat_abstractresource_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 4.1392000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_abstractresource_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.96980000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 76.57.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 16/200: xnat_resource_meta_data (4296 kB, 14626 rows, 28 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_resource_meta_data_xft_version on xnat_resource_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 3.3564000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_resource_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.43740000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 86.97.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 17/200: xnat_abstractresource (4024 kB, 11661 rows, 176 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xnat_abstractresource - no data in column note
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_abstractresource_label on xnat_abstractresource.label
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.17800000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_abstractresource_label
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.40100000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -125.28.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 18/200: xnat_resourcecatalog (2848 kB, 11661 rows, 14 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_resourcecatalog_resourcecatalog_info on xnat_resourcecatalog.resourcecatalog_info
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.26460000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_resourcecatalog_resourcecatalog_info
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.17860000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 32.50.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 19/200: xhbm_container_entity_output (2808 kB, 16326 rows, 129 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xhbm_container_entity_output - no data in column content
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xhbm_container_entity_output - no data in column created
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xhbm_container_entity_output - no data in column descritpion
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 20/200: xs_item_cache (2768 kB, 2212 rows, 21439 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xs_item_cache_elementname on xs_item_cache.elementname
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.3012000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xs_item_cache_elementname
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.42100000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 67.65.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 21/200: xnat_addfield (2512 kB, 123 rows, 269 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_addfield_addfield on xnat_addfield.addfield
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 0.60120000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_addfield_addfield
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.3934000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -131.77.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 22/200: xnat_imagescandata (2184 kB, 4542 rows, 730 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_imagescandata_image_session_id on xnat_imagescandata.image_session_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.16280000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_imagescandata_image_session_id
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.2214000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  ROLLBACK - only improved by -5.04.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 23/200: xhbm_container_entity_log_paths (1888 kB, 18178 rows, 301 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xhbm_container_entity_log_paths_container_entity on xhbm_container_entity_log_paths.container_entity
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 2.4576000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xhbm_container_entity_log_paths_container_entity
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.27760000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 88.70.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 24/200: xnat_imagescandata_meta_data (1840 kB, 5384 rows, 30 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_imagescandata_meta_data_xft_version on xnat_imagescandata_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.6532000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_imagescandata_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.17560000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 28.89.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 25/200: xnat_experimentdata (1408 kB, 2533 rows, 1529 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_experimentdata_date on xnat_experimentdata.date
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.2498000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_experimentdata_date
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 1.09240000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 12.59.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 26/200: xnat_ctscandata (1264 kB, 2538 rows, 32 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Skipped xnat_ctscandata - no data in column parameters_voxelres_units
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_ctscandata_parameters_voxelres_x on xnat_ctscandata.parameters_voxelres_x
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 3.9520000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_ctscandata_parameters_voxelres_x
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 2.4698000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 37.51.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 27/200: xdat_field_mapping (1248 kB, 3687 rows, 1469 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xdat_field_mapping_field on xdat_field_mapping.field
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.04300000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xdat_field_mapping_field
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.81880000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 21.50.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Test 28/200: xnat_ctscandata_meta_data (1088 kB, 3130 rows, 30 seq scans)
+psql:/tmp/test_large_tables.sql:232: NOTICE:  =========================================
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Testing idx_test_large_xnat_ctscandata_meta_data_xft_version on xnat_ctscandata_meta_data.xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Baseline: 1.4594000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Index created: idx_test_large_xnat_ctscandata_meta_data_xft_version
+psql:/tmp/test_large_tables.sql:232: NOTICE:  With index: 0.59620000000000000000.2f ms
+psql:/tmp/test_large_tables.sql:232: NOTICE:  KEEP - improved by 59.15.2f%
+psql:/tmp/test_large_tables.sql:232: NOTICE:  
+psql:/tmp/test_large_tables.sql:232: NOTICE:  Completed testing 28 tables
+DO
+Time: 9479.407 ms (00:09.479)
+
+=========================================
+SUMMARY
+=========================================
+
+ tables_tested | indexes_tested | kept | rolled_back | avg_improvement_pct | max_improvement_pct 
+---------------+----------------+------+-------------+---------------------+---------------------
+            27 |             27 |   20 |           7 |               66.19 |               94.50
+(1 row)
+
+Time: 38.861 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+                 table_name                  |                                    index_name                                    |        column_indexed         | improvement_pct 
+---------------------------------------------+----------------------------------------------------------------------------------+-------------------------------+-----------------
+ xhbm_container_entity_environment_variables | idx_test_large_xhbm_container_entity_environment_variables_environment_variables | Column: environment_variables |           94.50
+ wrk_workflowdata_meta_data                  | idx_test_large_wrk_workflowdata_meta_data_xft_version                            | Column: xft_version           |           92.83
+ xhbm_container_entity_log_paths             | idx_test_large_xhbm_container_entity_log_paths_container_entity                  | Column: container_entity      |           88.70
+ wrk_workflowdata                            | idx_test_large_wrk_workflowdata_comments                                         | Column: comments              |           87.41
+ xnat_resource_meta_data                     | idx_test_large_xnat_resource_meta_data_xft_version                               | Column: xft_version           |           86.97
+ xhbm_dicom_spatial_data                     | idx_test_large_xhbm_dicom_spatial_data_created                                   | Column: created               |           84.28
+ xnat_resourcecatalog_meta_data              | idx_test_large_xnat_resourcecatalog_meta_data_xft_version                        | Column: xft_version           |           83.18
+ xhbm_container_entity_mount                 | idx_test_large_xhbm_container_entity_mount_container_host_path                   | Column: container_host_path   |           82.06
+ xdat_user_login_meta_data                   | idx_test_large_xdat_user_login_meta_data_xft_version                             | Column: xft_version           |           81.38
+ xhbm_container_entity                       | idx_test_large_xhbm_container_entity_created                                     | Column: created               |           79.49
+ xnat_abstractresource_meta_data             | idx_test_large_xnat_abstractresource_meta_data_xft_version                       | Column: xft_version           |           76.57
+ xdat_user_login                             | idx_test_large_xdat_user_login_login_date                                        | Column: login_date            |           74.07
+ xs_item_cache                               | idx_test_large_xs_item_cache_elementname                                         | Column: elementname           |           67.65
+ xnat_ctscandata_meta_data                   | idx_test_large_xnat_ctscandata_meta_data_xft_version                             | Column: xft_version           |           59.15
+ xhbm_container_entity_container_labels      | idx_test_large_xhbm_container_entity_container_labels_container_labels           | Column: container_labels      |           52.62
+ xnat_ctscandata                             | idx_test_large_xnat_ctscandata_parameters_voxelres_x                             | Column: parameters_voxelres_x |           37.51
+ xnat_resourcecatalog                        | idx_test_large_xnat_resourcecatalog_resourcecatalog_info                         | Column: resourcecatalog_info  |           32.50
+ xnat_imagescandata_meta_data                | idx_test_large_xnat_imagescandata_meta_data_xft_version                          | Column: xft_version           |           28.89
+ xdat_field_mapping                          | idx_test_large_xdat_field_mapping_field                                          | Column: field                 |           21.50
+ xnat_experimentdata                         | idx_test_large_xnat_experimentdata_date                                          | Column: date                  |           12.59
+(20 rows)
+
+Time: 1.495 ms
+
+--- ROLLED BACK (<5% improvement) ---
+          table_name           |                       index_name                       |      column_indexed      | improvement_pct 
+-------------------------------+--------------------------------------------------------+--------------------------+-----------------
+ xhbm_container_entity_input   | idx_test_large_xhbm_container_entity_input_name        | Column: name             |            3.21
+ xnat_imagescandata            | idx_test_large_xnat_imagescandata_image_session_id     | Column: image_session_id |           -5.04
+ xdat_change_info              | idx_test_large_xdat_change_info_change_user            | Column: change_user      |          -36.30
+ xnat_resource                 | idx_test_large_xnat_resource_uri                       | Column: uri              |          -68.73
+ xnat_abstractresource         | idx_test_large_xnat_abstractresource_label             | Column: label            |         -125.28
+ xnat_addfield                 | idx_test_large_xnat_addfield_addfield                  | Column: addfield         |         -131.77
+ xhbm_container_entity_history | idx_test_large_xhbm_container_entity_history_entity_id | Column: entity_id        |         -217.48
+(7 rows)
+
+Time: 5.257 ms
+
+Results saved in pg_index_test_log table
+

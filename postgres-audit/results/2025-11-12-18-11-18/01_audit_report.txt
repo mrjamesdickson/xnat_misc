@@ -1,0 +1,1 @@
+psql: error: /tmp/01_database_audit.sql: No such file or directory

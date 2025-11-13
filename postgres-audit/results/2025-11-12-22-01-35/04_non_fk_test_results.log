@@ -1,0 +1,108 @@
+Timing is on.
+
+=========================================
+Testing Non-FK Index Candidates
+=========================================
+
+Based on query analysis:
+- xnat_imagesessiondata_history: 1,087 calls, 99.86% seq scans
+- xs_item_cache: 234 calls, 99.99% seq scans
+- xhbm_xdat_user_auth: 55 calls, 100% seq scans
+- xdat_user_login: High session_id lookups
+
+TRUNCATE TABLE
+Time: 41.838 ms
+CREATE FUNCTION
+Time: 13.152 ms
+Test function created
+
+
+=========================================
+Test 1: xnat_imagesessiondata_history
+=========================================
+Query pattern: WHERE id = X AND change_date IS NOT NULL AND change_date <= Y
+Calls: 1,087 | Seq scans: 99.86%
+
+psql:/tmp/test_non_fk_indexes.sql:134: NOTICE:  Baseline: 3.6312000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:134: NOTICE:  Index created: idx_test_imagesession_history_id_date(id, change_date)
+psql:/tmp/test_non_fk_indexes.sql:134: NOTICE:  With index: 1.2358000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:134: NOTICE:  KEEP - improved by 65.97.2f%
+DO
+Time: 92.601 ms
+
+=========================================
+Test 2: xs_item_cache
+=========================================
+Query pattern: WHERE elementName = X AND ids = Y
+Calls: 234 | Seq scans: 99.99%
+
+psql:/tmp/test_non_fk_indexes.sql:170: NOTICE:  Baseline: 1.4568000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:170: NOTICE:  Index created: idx_test_item_cache_element_ids(elementName, ids)
+psql:/tmp/test_non_fk_indexes.sql:170: NOTICE:  With index: 0.91520000000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:170: NOTICE:  KEEP - improved by 37.18.2f%
+DO
+Time: 77.494 ms
+
+=========================================
+Test 3: xhbm_xdat_user_auth
+=========================================
+Query pattern: WHERE id = X
+Calls: 55 | Seq scans: 100%
+
+psql:/tmp/test_non_fk_indexes.sql:202: NOTICE:  Baseline: 0.20900000000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:202: NOTICE:  Index created: idx_test_xdat_user_auth_id(id)
+psql:/tmp/test_non_fk_indexes.sql:202: NOTICE:  With index: 0.87820000000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:202: NOTICE:  ROLLBACK - only improved by -320.19.2f%
+DO
+Time: 34.325 ms
+
+=========================================
+Test 4: xdat_user_login
+=========================================
+Query pattern: WHERE session_id IN (...)
+Calls: 12 | Seq scans: 67.65%
+
+psql:/tmp/test_non_fk_indexes.sql:235: NOTICE:  Baseline: 7.9520000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:235: NOTICE:  Index created: idx_test_user_login_session(session_id)
+psql:/tmp/test_non_fk_indexes.sql:235: NOTICE:  With index: 1.14460000000000000000.2f ms
+psql:/tmp/test_non_fk_indexes.sql:235: NOTICE:  KEEP - improved by 85.61.2f%
+DO
+Time: 276.670 ms
+
+=========================================
+SUMMARY
+=========================================
+
+ tables_tested | indexes_tested | kept | rolled_back | errors | avg_improvement_pct 
+---------------+----------------+------+-------------+--------+---------------------
+             4 |              4 |    3 |           1 |      0 |               62.92
+(1 row)
+
+Time: 6.598 ms
+
+--- KEPT INDEXES (>= 5% improvement) ---
+          table_name           |              index_name               |          columns          | improvement_pct 
+-------------------------------+---------------------------------------+---------------------------+-----------------
+ xdat_user_login               | idx_test_user_login_session           | Columns: session_id       |           85.61
+ xnat_imagesessiondata_history | idx_test_imagesession_history_id_date | Columns: id, change_date  |           65.97
+ xs_item_cache                 | idx_test_item_cache_element_ids       | Columns: elementName, ids |           37.18
+(3 rows)
+
+Time: 2.258 ms
+
+--- ROLLED BACK (<5% improvement) ---
+     table_name      |         index_name         |   columns   | improvement_pct 
+---------------------+----------------------------+-------------+-----------------
+ xhbm_xdat_user_auth | idx_test_xdat_user_auth_id | Columns: id |         -320.19
+(1 row)
+
+Time: 1.543 ms
+psql:/tmp/test_non_fk_indexes.sql:289: NOTICE:  Dropped: idx_test_imagesession_history_id_date
+psql:/tmp/test_non_fk_indexes.sql:289: NOTICE:  Dropped: idx_test_item_cache_element_ids
+psql:/tmp/test_non_fk_indexes.sql:289: NOTICE:  Dropped: idx_test_user_login_session
+DO
+Time: 35.113 ms
+
+All test indexes cleaned up
+Results saved in pg_index_test_log table
+
