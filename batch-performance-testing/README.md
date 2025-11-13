@@ -1,6 +1,18 @@
 # XNAT Batch Performance Testing
 
-Scripts for batch container submission and monitoring on XNAT.
+Tools for testing XNAT container batch submission performance and monitoring workflow status.
+
+## Quick Start
+
+### Basic batch test:
+```bash
+./batch_test.sh -h https://xnat.example.com -u admin -p password
+```
+
+### With HTML report upload to XNAT project:
+```bash
+./batch_test.sh -h https://xnat.example.com -u admin -p password -r REPORTS
+```
 
 ## Scripts
 
@@ -9,12 +21,12 @@ Submits container jobs in batch across multiple experiments.
 
 **Usage:**
 ```bash
-./batch_test.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>]
+./batch_test.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]
 ```
 
 **Example:**
 ```bash
-./batch_test.sh -h http://demo02.xnatworks.io -u admin -p admin
+./batch_test.sh -h https://demo02.xnat.org -u admin -p password -m 10 -r RADVAL
 ```
 
 **Features:**
@@ -24,7 +36,18 @@ Submits container jobs in batch across multiple experiments.
 - Shows API call syntax before submission
 - Tests with first experiment before full batch
 - Tracks success/failure for each submission
-- Uses correct form-encoded payload (not JSON)
+- Performance metrics (throughput, avg/min/max times)
+- Detailed logs saved to `logs/YYYY-MM-DD/`
+- Optional workflow status monitoring
+- **Auto-generates and uploads HTML report if `-r` specified**
+
+**Options:**
+- `-h` XNAT host (required)
+- `-u` Username (required)
+- `-p` Password (required)
+- `-c` Container wrapper name/ID (optional - interactive if not provided)
+- `-m` Maximum jobs to submit (optional - defaults to all experiments)
+- `-r` Report project ID to upload results to (optional - creates BATCH_TESTS resource)
 
 **Workflow:**
 1. Authenticate → Select project → Select wrapper
@@ -33,6 +56,7 @@ Submits container jobs in batch across multiple experiments.
 4. Test launch on first experiment
 5. Batch submit to all experiments
 6. Report success/failure counts
+7. **Generate and upload HTML report (if `-r` specified)**
 
 ### `check_status.sh` - Workflow Status Monitor ✅
 Monitors workflow job status for a project (queries XNAT workflow table).
@@ -70,6 +94,47 @@ Monitors workflow job status for a project (queries XNAT workflow table).
 - Sorted by most recent first
 - Watch mode for real-time monitoring
 
+### `generate_html_report.sh` - HTML Report Generator ✅
+Converts batch test logs to interactive HTML reports and uploads to XNAT.
+
+**Usage:**
+```bash
+# Generate single report
+./generate_html_report.sh -l logs/2025-01-13/batch_test_143022.log
+
+# Generate and upload to XNAT
+./generate_html_report.sh -l <LOG_FILE> -h <HOST> -u <USER> -p <PASS> -r <PROJECT>
+
+# Generate reports for all logs
+./generate_html_report.sh -a
+```
+
+**Options:**
+- `-l` Log file to convert (optional - interactive if not provided)
+- `-o` Output HTML file (optional - defaults to `<log_name>.html`)
+- `-a` Generate reports for all logs (creates `reports/` directory + index.html)
+- `-h` XNAT host (required for upload)
+- `-u` Username (required for upload)
+- `-p` Password (required for upload)
+- `-r` Report project ID (uploads to project-level `BATCH_TESTS` resource)
+
+**HTML Report Features:**
+- 📊 Visual dashboard with statistics cards
+- 📈 Animated progress bars showing success/fail rates
+- 🎨 Color-coded metrics (success=green, fail=red, performance=gradient)
+- 🔍 Filterable job log (all/success/fail)
+- 📱 Responsive design
+- 🖨️ Print-friendly CSS
+- 📑 Auto-generated index.html for multiple reports
+
+**Upload to XNAT:**
+When `-r` is specified, uploads to project-level resource with date-based organization:
+- Resource: `BATCH_TESTS`
+- Structure: `YYYY-MM-DD/YYYYMMDD_HHMMSS_batch_test_HHMMSS.html` (report)
+- Structure: `YYYY-MM-DD/YYYYMMDD_HHMMSS_batch_test_HHMMSS.log` (original log)
+- Files organized in date subfolders for easy navigation
+- Provides direct link to view in XNAT
+
 ### `check_workflows.sh` - Workflow Monitor
 Checks XNAT workflow table for recent jobs.
 
@@ -103,20 +168,87 @@ Wrappers operate on specific XNAT data types:
 
 Make sure the wrapper context matches your data!
 
-## Example Workflow
+## Report Project Setup
 
+Create a dedicated project for batch test reports:
+
+1. Create project in XNAT (e.g., `REPORTS`, `RADVAL`)
+2. Set appropriate permissions
+3. Use with `-r` flag in batch_test.sh or generate_html_report.sh
+
+The `BATCH_TESTS` resource will be created automatically on first upload.
+
+### Resource Structure
+
+Reports are organized by date in the BATCH_TESTS resource:
+```
+BATCH_TESTS/
+├── 2025-11-13/
+│   ├── 20251113_140235_batch_test_140235.html
+│   ├── 20251113_140235_batch_test_140235.log
+│   ├── 20251113_140913_batch_test_140913.html
+│   └── 20251113_140913_batch_test_140913.log
+└── 2025-11-14/
+    ├── 20251114_093021_batch_test_093021.html
+    └── 20251114_093021_batch_test_093021.log
+```
+
+Each test run uploads both:
+- **HTML report** - Interactive visual dashboard
+- **Text log** - Original raw log file
+
+## Example Workflows
+
+### Complete workflow with report upload:
 ```bash
-# 1. Submit batch jobs
-./batch_test.sh -h http://demo02.xnatworks.io -u admin -p admin
+# 1. Run batch test with report upload
+./batch_test.sh -h https://demo02.xnat.org -u admin -p password -r RADVAL -m 10
 
-# 2. Monitor in watch mode
-./check_status.sh -h http://demo02.xnatworks.io -u admin -p admin -j TOTALSEGMENTATOR -w
+# (Auto-generates HTML report and uploads to RADVAL/BATCH_TESTS)
 
-# 3. Check specific date range
-./check_status.sh -h http://demo02.xnatworks.io -u admin -p admin -j TOTALSEGMENTATOR -r today
+# 2. Monitor workflows
+./check_status.sh -h https://demo02.xnat.org -u admin -p password -j RADVAL -r today
+```
 
-# 4. Check workflows
-./check_workflows.sh -h http://demo02.xnatworks.io -u admin -p admin -j TOTALSEGMENTATOR
+### Generate report from existing log:
+```bash
+# Generate and upload report
+./generate_html_report.sh \
+  -l logs/2025-01-13/batch_test_143022.log \
+  -h https://demo02.xnat.org \
+  -u admin \
+  -p password \
+  -r RADVAL
+```
+
+### Generate reports for all logs:
+```bash
+# Creates reports/ directory with index.html
+./generate_html_report.sh -a
+```
+
+## Directory Structure
+
+### Local Directory
+```
+batch-performance-testing/
+├── batch_test.sh              # Main batch testing script
+├── generate_html_report.sh    # HTML report generator
+├── check_status.sh            # Workflow status monitor
+├── logs/                      # Test logs (by date)
+│   └── YYYY-MM-DD/
+│       └── batch_test_HHMMSS.log
+└── reports/                   # HTML reports (when using -a)
+    ├── index.html
+    └── batch_test_HHMMSS.html
+```
+
+### XNAT Resource Structure (when uploading with -r)
+```
+XNAT Project > Resources > BATCH_TESTS/
+└── YYYY-MM-DD/                # Date-based subfolder
+    ├── YYYYMMDD_HHMMSS_batch_test_HHMMSS.html  # HTML report
+    └── YYYYMMDD_HHMMSS_batch_test_HHMMSS.log   # Raw log
 ```
 
 ## API Implementation

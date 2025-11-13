@@ -13,23 +13,25 @@ NC='\033[0m' # No Color
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
     echo "  -c  Container name to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
+    echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
     exit 1
 }
 
 # Parse arguments
-while getopts "h:u:p:c:m:" opt; do
+while getopts "h:u:p:c:m:r:" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
         p) PASSWORD="$OPTARG" ;;
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
+        r) REPORT_PROJECT="$OPTARG" ;;
         *) usage ;;
     esac
 done
@@ -380,11 +382,40 @@ fi
 echo ""
 echo "Submitting batch..."
 
+# Initialize timing and logging
+BATCH_START_TIME=$(date +%s)
+BATCH_START_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+LOG_DIR="logs/$(date '+%Y-%m-%d')"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/batch_test_$(date '+%H%M%S').log"
+
 SUCCESS_COUNT=0
 FAIL_COUNT=0
 RESULTS_FILE="/tmp/batch_results_$$.txt"
+TIMING_FILE="/tmp/batch_timing_$$.txt"
+
+# Write log header
+cat > "$LOG_FILE" <<EOF
+=================================================================
+XNAT Batch Performance Test Log
+=================================================================
+Test Started: $BATCH_START_TIMESTAMP
+Host: $XNAT_HOST
+User: $USERNAME
+Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS total experiments)
+Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
+Experiments to Process: $EXPERIMENT_COUNT
+Max Jobs Limit: ${MAX_JOBS:-None (processing all)}
+=================================================================
+
+EOF
+
+echo ""
+echo "Logging to: $LOG_FILE"
+echo ""
 
 echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
+    JOB_START_TIME=$(date +%s.%N)
     # Use form data (not JSON) with context=session parameter
     RESPONSE=$(curl -s -X POST \
         -b "JSESSIONID=$JSESSION" \
@@ -392,10 +423,24 @@ echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
         "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
         -d "context=session&session=${EXP_ID}")
 
+    JOB_END_TIME=$(date +%s.%N)
+    JOB_DURATION=$(echo "$JOB_END_TIME - $JOB_START_TIME" | bc)
+    JOB_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
     # Check if response is HTML (error page) or JSON
     if echo "$RESPONSE" | grep -q "<!doctype html"; then
-        echo -e "${RED}✗${NC} $EXP_ID: $(echo "$RESPONSE" | grep -oP '(?<=<title>)[^<]+' | head -1)"
+        ERROR_TITLE=$(echo "$RESPONSE" | grep -oP '(?<=<title>)[^<]+' | head -1)
+        echo -e "${RED}✗${NC} $EXP_ID: $ERROR_TITLE"
         echo "FAIL" >> "$RESULTS_FILE"
+        echo "$JOB_DURATION" >> "$TIMING_FILE"
+
+        # Log to file
+        cat >> "$LOG_FILE" <<EOF
+[$JOB_TIMESTAMP] FAIL - $EXP_ID
+  Duration: ${JOB_DURATION}s
+  Error: $ERROR_TITLE
+
+EOF
     elif echo "$RESPONSE" | jq empty 2>/dev/null; then
         # Valid JSON response - check for success
         STATUS=$(echo "$RESPONSE" | jq -r '.status // "unknown"')
@@ -403,16 +448,47 @@ echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
             WORKFLOW_ID=$(echo "$RESPONSE" | jq -r '.["workflow-id"] // "pending"')
             echo -e "${GREEN}✓${NC} $EXP_ID (workflow: $WORKFLOW_ID)"
             echo "SUCCESS" >> "$RESULTS_FILE"
+            echo "$JOB_DURATION" >> "$TIMING_FILE"
+
+            # Log to file
+            cat >> "$LOG_FILE" <<EOF
+[$JOB_TIMESTAMP] SUCCESS - $EXP_ID
+  Duration: ${JOB_DURATION}s
+  Workflow ID: $WORKFLOW_ID
+
+EOF
         else
             ERROR_MSG=$(echo "$RESPONSE" | jq -r '.message // .error // "Unknown error"')
             echo -e "${RED}✗${NC} $EXP_ID: $ERROR_MSG"
             echo "FAIL" >> "$RESULTS_FILE"
+            echo "$JOB_DURATION" >> "$TIMING_FILE"
+
+            # Log to file
+            cat >> "$LOG_FILE" <<EOF
+[$JOB_TIMESTAMP] FAIL - $EXP_ID
+  Duration: ${JOB_DURATION}s
+  Error: $ERROR_MSG
+
+EOF
         fi
     else
         echo -e "${RED}✗${NC} $EXP_ID: Invalid response"
         echo "FAIL" >> "$RESULTS_FILE"
+        echo "$JOB_DURATION" >> "$TIMING_FILE"
+
+        # Log to file
+        cat >> "$LOG_FILE" <<EOF
+[$JOB_TIMESTAMP] FAIL - $EXP_ID
+  Duration: ${JOB_DURATION}s
+  Error: Invalid response
+
+EOF
     fi
 done
+
+BATCH_END_TIME=$(date +%s)
+BATCH_END_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+TOTAL_DURATION=$((BATCH_END_TIME - BATCH_START_TIME))
 
 # Count results from file (since while loop runs in subshell)
 if [ -f "$RESULTS_FILE" ]; then
@@ -424,10 +500,105 @@ else
     FAIL_COUNT=0
 fi
 
+# Ensure counts are numeric (handle empty strings)
+SUCCESS_COUNT=${SUCCESS_COUNT:-0}
+FAIL_COUNT=${FAIL_COUNT:-0}
+
+# Calculate timing statistics
+if [ -f "$TIMING_FILE" ]; then
+    AVG_DURATION=$(awk '{ total += $1; count++ } END { if (count > 0) print total/count; else print 0 }' "$TIMING_FILE")
+    MIN_DURATION=$(sort -n "$TIMING_FILE" | head -1)
+    MAX_DURATION=$(sort -n "$TIMING_FILE" | tail -1)
+    rm "$TIMING_FILE"
+else
+    AVG_DURATION=0
+    MIN_DURATION=0
+    MAX_DURATION=0
+fi
+
+# Ensure all numeric variables are set (handle empty strings)
+EXPERIMENT_COUNT=${EXPERIMENT_COUNT:-0}
+TOTAL_DURATION=${TOTAL_DURATION:-0}
+AVG_DURATION=${AVG_DURATION:-0}
+MIN_DURATION=${MIN_DURATION:-0}
+MAX_DURATION=${MAX_DURATION:-0}
+
+# Calculate percentages for log file
+if [ "$EXPERIMENT_COUNT" -gt 0 ] 2>/dev/null; then
+    LOG_SUCCESS_PCT=$(awk "BEGIN {printf \"%.1f\", ($SUCCESS_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
+    LOG_FAIL_PCT=$(awk "BEGIN {printf \"%.1f\", ($FAIL_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
+else
+    LOG_SUCCESS_PCT="0.0"
+    LOG_FAIL_PCT="0.0"
+fi
+
+LOG_DURATION_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_DURATION/60}" 2>/dev/null || echo "0.0")
+
+if [ "$TOTAL_DURATION" -gt 0 ] 2>/dev/null; then
+    LOG_THROUGHPUT=$(awk "BEGIN {printf \"%.2f\", $EXPERIMENT_COUNT/$TOTAL_DURATION}" 2>/dev/null || echo "0.00")
+else
+    LOG_THROUGHPUT="0.00"
+fi
+
+# Write summary to log
+cat >> "$LOG_FILE" <<EOF
+=================================================================
+Test Summary
+=================================================================
+Test Completed: $BATCH_END_TIMESTAMP
+Test Duration: ${TOTAL_DURATION}s (${LOG_DURATION_MIN} minutes)
+
+Test Configuration:
+  Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS total experiments)
+  Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
+  Max Jobs Limit: ${MAX_JOBS:-None}
+  Host: $XNAT_HOST
+  User: $USERNAME
+
+Results:
+  Jobs Submitted: $EXPERIMENT_COUNT
+  Successful: $SUCCESS_COUNT (${LOG_SUCCESS_PCT}%)
+  Failed: $FAIL_COUNT (${LOG_FAIL_PCT}%)
+
+Performance Metrics:
+  Total Duration: ${TOTAL_DURATION}s
+  Average Job Submission Time: ${AVG_DURATION}s
+  Fastest Submission: ${MIN_DURATION}s
+  Slowest Submission: ${MAX_DURATION}s
+  Throughput: ${LOG_THROUGHPUT} jobs/sec
+=================================================================
+EOF
+
 echo ""
-echo -e "${GREEN}=== COMPLETE ===${NC}"
-echo "Success: $SUCCESS_COUNT"
-echo "Failed: $FAIL_COUNT"
+echo -e "${GREEN}=== BATCH TEST COMPLETE ===${NC}"
+echo ""
+echo "Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS experiments)"
+echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
+echo "Jobs Submitted: $EXPERIMENT_COUNT"
+echo ""
+echo "Results:"
+if [ "$EXPERIMENT_COUNT" -gt 0 ] 2>/dev/null; then
+    SUCCESS_PCT=$(awk "BEGIN {printf \"%.1f\", ($SUCCESS_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
+    FAIL_PCT=$(awk "BEGIN {printf \"%.1f\", ($FAIL_COUNT/$EXPERIMENT_COUNT)*100}" 2>/dev/null || echo "0.0")
+else
+    SUCCESS_PCT="0.0"
+    FAIL_PCT="0.0"
+fi
+echo "  Success: $SUCCESS_COUNT (${SUCCESS_PCT}%)"
+echo "  Failed: $FAIL_COUNT (${FAIL_PCT}%)"
+echo ""
+echo "Performance:"
+DURATION_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_DURATION/60}" 2>/dev/null || echo "0.0")
+if [ "$TOTAL_DURATION" -gt 0 ] 2>/dev/null; then
+    THROUGHPUT=$(awk "BEGIN {printf \"%.2f\", $EXPERIMENT_COUNT/$TOTAL_DURATION}" 2>/dev/null || echo "0.00")
+else
+    THROUGHPUT="0.00"
+fi
+echo "  Total Duration: ${TOTAL_DURATION}s (${DURATION_MIN} min)"
+echo "  Avg Submission Time: ${AVG_DURATION}s"
+echo "  Throughput: ${THROUGHPUT} jobs/sec"
+echo ""
+echo -e "${YELLOW}Full log saved to: $LOG_FILE${NC}"
 echo ""
 
 # Offer to monitor job status
@@ -539,5 +710,26 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         echo ""
         echo -e "${YELLOW}Tip: Run ./check_status.sh -h $XNAT_HOST -u <user> -p <pass> -j $LARGEST_PROJECT -r today for detailed monitoring${NC}"
+    fi
+fi
+
+# Generate and upload HTML report if requested
+if [ -n "$REPORT_PROJECT" ]; then
+    echo ""
+    echo -e "${YELLOW}=== GENERATING HTML REPORT ===${NC}"
+    echo ""
+
+    # Check if generate_html_report.sh exists
+    if [ -f "./generate_html_report.sh" ]; then
+        # Generate and upload report
+        ./generate_html_report.sh \
+            -l "$LOG_FILE" \
+            -h "$XNAT_HOST" \
+            -u "$USERNAME" \
+            -p "$PASSWORD" \
+            -r "$REPORT_PROJECT"
+    else
+        echo -e "${RED}generate_html_report.sh not found${NC}"
+        echo "Skipping HTML report generation"
     fi
 fi
