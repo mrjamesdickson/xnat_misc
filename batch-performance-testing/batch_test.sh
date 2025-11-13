@@ -673,25 +673,50 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         echo -ne "\r${YELLOW}Check $CHECK_COUNT (${ELAPSED_MIN} min elapsed) - Fetching workflow status...${NC}  "
 
-        # Fetch workflows from last submission time
-        WORKFLOWS=$(curl -s -X POST \
-            -b "JSESSIONID=$JSESSION" \
-            -H "Content-Type: application/json" \
-            -H "X-Requested-With: XMLHttpRequest" \
-            --max-time 30 \
-            "${XNAT_HOST}/xapi/workflows" \
-            -d "{\"page\":1,\"id\":\"$LARGEST_PROJECT\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}" 2>/dev/null)
+        # Fetch workflows with pagination (may need multiple pages)
+        ALL_WORKFLOWS="[]"
+        PAGE=1
+        MAX_PAGES=10
 
-        if [ -z "$WORKFLOWS" ]; then
-            echo -ne "\r${RED}Failed to fetch workflows, retrying...${NC}                    "
+        while [ $PAGE -le $MAX_PAGES ]; do
+            PAGE_WORKFLOWS=$(curl -s -X POST \
+                -b "JSESSIONID=$JSESSION" \
+                -H "Content-Type: application/json" \
+                -H "X-Requested-With: XMLHttpRequest" \
+                --max-time 30 \
+                "${XNAT_HOST}/xapi/workflows" \
+                -d "{\"page\":$PAGE,\"id\":\"$LARGEST_PROJECT\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}" 2>/dev/null)
+
+            if [ -z "$PAGE_WORKFLOWS" ]; then
+                break
+            fi
+
+            # Extract items array
+            PAGE_ITEMS=$(echo "$PAGE_WORKFLOWS" | jq 'if type == "array" then . else .items // .workflows // [] end' 2>/dev/null)
+            PAGE_COUNT=$(echo "$PAGE_ITEMS" | jq 'length' 2>/dev/null)
+
+            if [ -z "$PAGE_COUNT" ] || [ "$PAGE_COUNT" -eq 0 ]; then
+                break
+            fi
+
+            # Merge with accumulated workflows
+            ALL_WORKFLOWS=$(echo "$ALL_WORKFLOWS" "$PAGE_ITEMS" | jq -s '.[0] + .[1]' 2>/dev/null)
+
+            # If page returned less than 50, we've reached the end
+            if [ "$PAGE_COUNT" -lt 50 ]; then
+                break
+            fi
+
+            PAGE=$((PAGE + 1))
+        done
+
+        if [ "$ALL_WORKFLOWS" = "[]" ]; then
+            echo -ne "\r${YELLOW}No workflows found yet, waiting...${NC}                              "
             continue
         fi
 
         # Filter workflows to only those from our batch (after BATCH_START_TIME)
-        BATCH_WORKFLOWS=$(echo "$WORKFLOWS" | jq --arg container "$CONTAINER_NAME" --argjson start_time "$BATCH_START_TIME" '
-            if type == "array" then .
-            else .items // .workflows // []
-            end |
+        BATCH_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq --arg container "$CONTAINER_NAME" --argjson start_time "$BATCH_START_TIME" '
             map(select(
                 (.pipelineName // .pipeline_name // "") == $container and
                 ((.launchTime // .launch_time // 0) / 1000) >= $start_time
