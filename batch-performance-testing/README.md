@@ -21,12 +21,16 @@ Submits container jobs in batch across multiple experiments.
 
 **Usage:**
 ```bash
-./batch_test.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]
+./batch_test.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]
 ```
 
 **Example:**
 ```bash
+# Interactive project selection
 ./batch_test.sh -h https://demo02.xnat.org -u admin -p password -m 10 -r RADVAL
+
+# Skip to specific project
+./batch_test.sh -h https://demo02.xnat.org -u admin -p password -j test2 -c debug-session -m 10
 ```
 
 **Features:**
@@ -45,6 +49,7 @@ Submits container jobs in batch across multiple experiments.
 - `-h` XNAT host (required)
 - `-u` Username (required)
 - `-p` Password (required)
+- `-j` Project ID to test (optional - shows interactive selection if not provided)
 - `-c` Container wrapper name/ID (optional - interactive if not provided)
 - `-m` Maximum jobs to submit (optional - defaults to all experiments)
 - `-r` Report project ID to upload results to (optional - creates BATCH_TESTS resource)

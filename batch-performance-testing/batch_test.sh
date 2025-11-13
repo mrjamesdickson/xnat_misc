@@ -13,10 +13,11 @@ NC='\033[0m' # No Color
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
+    echo "  -j  Project ID to test (optional - will show selection if not provided)"
     echo "  -c  Container name to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
@@ -24,11 +25,12 @@ usage() {
 }
 
 # Parse arguments
-while getopts "h:u:p:c:m:r:" opt; do
+while getopts "h:u:p:j:c:m:r:" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
         p) PASSWORD="$OPTARG" ;;
+        j) LARGEST_PROJECT="$OPTARG" ;;
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
@@ -60,49 +62,54 @@ fi
 echo -e "${GREEN}✓ Authenticated (JSESSION: ${JSESSION:0:20}...)${NC}"
 echo ""
 
-# Step 2: Select project first
-echo -e "${YELLOW}[2/5] Project selection...${NC}"
-echo "Fetching projects list..."
-PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
+# Step 2: Select project first (skip if -j provided)
+if [ -z "$LARGEST_PROJECT" ]; then
+    echo -e "${YELLOW}[2/5] Project selection...${NC}"
+    echo "Fetching projects list..."
+    PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
 
-PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
-echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
-echo ""
+    PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
+    echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
+    echo ""
 
-# Get experiment counts for each project using filtered queries with progress indicator
-PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
-    COUNTER=0
-    while read -r PROJECT_ID; do
-        COUNTER=$((COUNTER + 1))
-        echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
-        # Use ?project= filter for more efficient server-side filtering
-        EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
-        echo "$EXP_COUNT:$PROJECT_ID"
+    # Get experiment counts for each project using filtered queries with progress indicator
+    PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
+        COUNTER=0
+        while read -r PROJECT_ID; do
+            COUNTER=$((COUNTER + 1))
+            echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
+            # Use ?project= filter for more efficient server-side filtering
+            EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
+            echo "$EXP_COUNT:$PROJECT_ID"
+        done
+        echo "" >&2
+    } | sort -rn)
+
+    echo ""
+    echo "Top 10 projects by experiment count:"
+    echo "$PROJECT_COUNTS" | head -10 | nl -w 3 -s '. ' | while IFS=':' read -r NUM COUNT_PROJECT; do
+        COUNT=$(echo "$COUNT_PROJECT" | cut -d: -f1)
+        PROJECT=$(echo "$COUNT_PROJECT" | cut -d: -f2)
+        printf "%s %s (%s experiments)\n" "$NUM" "$PROJECT" "$COUNT"
     done
-    echo "" >&2
-} | sort -rn)
 
-echo ""
-echo "Top 10 projects by experiment count:"
-echo "$PROJECT_COUNTS" | head -10 | nl -w 3 -s '. ' | while IFS=':' read -r NUM COUNT_PROJECT; do
-    COUNT=$(echo "$COUNT_PROJECT" | cut -d: -f1)
-    PROJECT=$(echo "$COUNT_PROJECT" | cut -d: -f2)
-    printf "%s %s (%s experiments)\n" "$NUM" "$PROJECT" "$COUNT"
-done
+    echo ""
+    read -p "Enter project ID to use (or press Enter for largest): " SELECTED_PROJECT
 
-echo ""
-read -p "Enter project ID to use (or press Enter for largest): " SELECTED_PROJECT
-
-if [ -z "$SELECTED_PROJECT" ]; then
-    # Use largest project
-    LARGEST_PROJECT=$(echo "$PROJECT_COUNTS" | head -1 | cut -d: -f2)
-    echo "Using largest project: $LARGEST_PROJECT"
+    if [ -z "$SELECTED_PROJECT" ]; then
+        # Use largest project
+        LARGEST_PROJECT=$(echo "$PROJECT_COUNTS" | head -1 | cut -d: -f2)
+        echo "Using largest project: $LARGEST_PROJECT"
+    else
+        LARGEST_PROJECT="$SELECTED_PROJECT"
+    fi
 else
-    LARGEST_PROJECT="$SELECTED_PROJECT"
+    echo -e "${YELLOW}[2/5] Project selection...${NC}"
+    echo "Using specified project: $LARGEST_PROJECT"
 fi
 
 # Get experiment count for selected project
-MAX_EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${LARGEST_PROJECT}/experiments?format=json" | jq -r '.ResultSet.totalRecords // 0')
+MAX_EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${LARGEST_PROJECT}&format=json" | jq -r '.ResultSet.totalRecords // 0')
 
 echo ""
 echo -e "${GREEN}✓ Selected project: $LARGEST_PROJECT ($MAX_EXPERIMENTS experiments)${NC}"
