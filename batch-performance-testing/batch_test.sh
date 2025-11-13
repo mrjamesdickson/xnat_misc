@@ -13,21 +13,23 @@ NC='\033[0m' # No Color
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
     echo "  -c  Container name to run (optional - will list if not provided)"
+    echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     exit 1
 }
 
 # Parse arguments
-while getopts "h:u:p:c:" opt; do
+while getopts "h:u:p:c:m:" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
         p) PASSWORD="$OPTARG" ;;
         c) CONTAINER_NAME="$OPTARG" ;;
+        m) MAX_JOBS="$OPTARG" ;;
         *) usage ;;
     esac
 done
@@ -255,9 +257,23 @@ echo ""
 echo -e "${YELLOW}[4/5] Retrieving experiments from $LARGEST_PROJECT...${NC}"
 EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${LARGEST_PROJECT}/experiments?format=json")
 EXPERIMENT_IDS=$(echo "$EXPERIMENTS" | jq -r '.ResultSet.Result[] | .ID')
-EXPERIMENT_COUNT=$(echo "$EXPERIMENT_IDS" | wc -l | tr -d ' ')
+TOTAL_EXPERIMENT_COUNT=$(echo "$EXPERIMENT_IDS" | wc -l | tr -d ' ')
 
-echo -e "${GREEN}✓ Retrieved $EXPERIMENT_COUNT experiments${NC}"
+# Apply max jobs limit if specified
+if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ]; then
+    if [ "$MAX_JOBS" -lt "$TOTAL_EXPERIMENT_COUNT" ]; then
+        EXPERIMENT_IDS=$(echo "$EXPERIMENT_IDS" | head -n "$MAX_JOBS")
+        EXPERIMENT_COUNT="$MAX_JOBS"
+        echo -e "${GREEN}✓ Retrieved $TOTAL_EXPERIMENT_COUNT experiments (limiting to $MAX_JOBS)${NC}"
+    else
+        EXPERIMENT_COUNT="$TOTAL_EXPERIMENT_COUNT"
+        echo -e "${GREEN}✓ Retrieved $EXPERIMENT_COUNT experiments${NC}"
+    fi
+else
+    EXPERIMENT_COUNT="$TOTAL_EXPERIMENT_COUNT"
+    echo -e "${GREEN}✓ Retrieved $EXPERIMENT_COUNT experiments${NC}"
+fi
+
 echo ""
 echo "First 10 experiments:"
 echo "$EXPERIMENT_IDS" | head -10
