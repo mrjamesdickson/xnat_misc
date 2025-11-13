@@ -17,7 +17,8 @@ usage() {
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
-    echo "  -j  Project ID to test (optional - will show selection if not provided)"
+    echo "  -j  Project ID to test (optional - shows interactive selection if not provided)"
+    echo "  -C  Use cached project counts (faster, skips API calls for project enumeration)"
     echo "  -c  Container name to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
@@ -25,7 +26,8 @@ usage() {
 }
 
 # Parse arguments
-while getopts "h:u:p:j:c:m:r:" opt; do
+USE_CACHE=false
+while getopts "h:u:p:j:c:m:r:C" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -34,6 +36,7 @@ while getopts "h:u:p:j:c:m:r:" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
+        C) USE_CACHE=true ;;
         *) usage ;;
     esac
 done
@@ -65,25 +68,49 @@ echo ""
 # Step 2: Select project first (skip if -j provided)
 if [ -z "$LARGEST_PROJECT" ]; then
     echo -e "${YELLOW}[2/5] Project selection...${NC}"
-    echo "Fetching projects list..."
-    PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
 
-    PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
-    echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
-    echo ""
+    # Create cache directory in current directory
+    CACHE_DIR=".cache"
+    mkdir -p "$CACHE_DIR"
 
-    # Get experiment counts for each project using filtered queries with progress indicator
-    PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
-        COUNTER=0
-        while read -r PROJECT_ID; do
-            COUNTER=$((COUNTER + 1))
-            echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
-            # Use ?project= filter for more efficient server-side filtering
-            EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
-            echo "$EXP_COUNT:$PROJECT_ID"
-        done
-        echo "" >&2
-    } | sort -rn)
+    # Generate cache filename based on host
+    CACHE_HOST=$(echo "$XNAT_HOST" | sed 's|https\?://||' | sed 's|[:/]|_|g')
+    CACHE_FILE="$CACHE_DIR/project_counts_${CACHE_HOST}.txt"
+
+    # Check if we should use cache
+    if [ "$USE_CACHE" = true ] && [ -f "$CACHE_FILE" ]; then
+        echo "Using cached project counts from: $CACHE_FILE"
+        CACHE_AGE=$(($(date +%s) - $(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null)))
+        CACHE_AGE_MIN=$((CACHE_AGE / 60))
+        echo "Cache age: ${CACHE_AGE_MIN} minutes"
+        echo ""
+
+        PROJECT_COUNTS=$(cat "$CACHE_FILE")
+    else
+        echo "Fetching projects list..."
+        PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
+
+        PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
+        echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
+        echo ""
+
+        # Get experiment counts for each project using filtered queries with progress indicator
+        PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
+            COUNTER=0
+            while read -r PROJECT_ID; do
+                COUNTER=$((COUNTER + 1))
+                echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
+                # Use ?project= filter for more efficient server-side filtering
+                EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
+                echo "$EXP_COUNT:$PROJECT_ID"
+            done
+            echo "" >&2
+        } | sort -rn)
+
+        # Save to cache
+        echo "$PROJECT_COUNTS" > "$CACHE_FILE"
+        echo "Cached project counts to: $CACHE_FILE"
+    fi
 
     echo ""
     echo "Top 10 projects by experiment count:"
