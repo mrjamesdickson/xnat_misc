@@ -299,6 +299,11 @@ FASTEST=$(grep "^  Fastest Submission:" "$LOG_FILE" | sed 's/  Fastest Submissio
 SLOWEST=$(grep "^  Slowest Submission:" "$LOG_FILE" | sed 's/  Slowest Submission: //')
 THROUGHPUT=$(grep "^  Throughput:" "$LOG_FILE" | sed 's/  Throughput: //')
 
+# Extract execution monitoring data if available
+EXECUTION_TIME=$(grep "^Execution Time:" "$LOG_FILE" | tail -1 | sed 's/Execution Time: //')
+TOTAL_WITH_EXECUTION=$(grep "^Total Time (Submission + Execution):" "$LOG_FILE" | tail -1 | sed 's/Total Time (Submission + Execution): //')
+FINAL_STATUS=$(grep "^Final Status:" "$LOG_FILE" | tail -1 | sed 's/Final Status: //')
+
 # Extract success/fail counts for chart
 SUCCESS_COUNT=$(echo "$SUCCESSFUL" | sed -E 's/^([0-9]+).*/\1/' || echo "0")
 FAIL_COUNT=$(echo "$FAILED" | sed -E 's/^([0-9]+).*/\1/' || echo "0")
@@ -670,6 +675,27 @@ cat > "$OUTPUT_FILE" <<EOF
         <div class="section">
             <h2 class="section-title">Performance Metrics</h2>
             <div class="metadata">
+                <div class="metadata-item">
+                    <div class="metadata-label">Submission Duration</div>
+                    <div class="metadata-value">$TOTAL_DURATION</div>
+                </div>
+EOF
+
+# Add execution time if available
+if [ -n "$EXECUTION_TIME" ]; then
+    cat >> "$OUTPUT_FILE" <<EOF
+                <div class="metadata-item">
+                    <div class="metadata-label">Execution Duration</div>
+                    <div class="metadata-value">$EXECUTION_TIME</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Total Time (Submission + Execution)</div>
+                    <div class="metadata-value">$TOTAL_WITH_EXECUTION</div>
+                </div>
+EOF
+fi
+
+cat >> "$OUTPUT_FILE" <<EOF
                 <div class="metadata-item">
                     <div class="metadata-label">Average Submission Time</div>
                     <div class="metadata-value">$AVG_TIME</div>

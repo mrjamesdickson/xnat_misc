@@ -729,6 +729,21 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo "  Total Runtime: ${ELAPSED_MIN} minutes"
             echo ""
 
+            # Update log file with execution time
+            TOTAL_WITH_EXECUTION=$((TOTAL_DURATION + ELAPSED))
+            TOTAL_WITH_EXECUTION_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_WITH_EXECUTION/60}" 2>/dev/null || echo "0.0")
+
+            cat >> "$LOG_FILE" <<EOF
+
+=================================================================
+Job Execution Monitoring
+=================================================================
+Execution Time: ${ELAPSED}s (${ELAPSED_MIN} minutes)
+Final Status: ${COMPLETE:-0} Complete, ${FAILED:-0} Failed
+Total Time (Submission + Execution): ${TOTAL_WITH_EXECUTION}s (${TOTAL_WITH_EXECUTION_MIN} minutes)
+=================================================================
+EOF
+
             # Store workflows for display below
             FINAL_WORKFLOWS="$BATCH_WORKFLOWS"
             break
