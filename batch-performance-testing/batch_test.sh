@@ -109,7 +109,28 @@ else
 fi
 
 # Get experiment count for selected project
-MAX_EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${LARGEST_PROJECT}&format=json" | jq -r '.ResultSet.totalRecords // 0')
+MAX_EXPERIMENTS_RESPONSE=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${LARGEST_PROJECT}&format=json")
+
+# Check if response is valid JSON
+if ! echo "$MAX_EXPERIMENTS_RESPONSE" | jq empty 2>/dev/null; then
+    echo -e "${RED}Failed to retrieve experiments for project: $LARGEST_PROJECT${NC}"
+    echo "Response: $MAX_EXPERIMENTS_RESPONSE"
+    echo ""
+    echo "This may indicate an invalid project ID."
+    exit 1
+fi
+
+MAX_EXPERIMENTS=$(echo "$MAX_EXPERIMENTS_RESPONSE" | jq -r '.ResultSet.totalRecords // 0')
+
+if [ "$MAX_EXPERIMENTS" = "0" ]; then
+    echo -e "${YELLOW}Warning: Project $LARGEST_PROJECT has 0 experiments${NC}"
+    echo ""
+    read -p "Continue anyway? (y/yes): " CONTINUE_EMPTY
+    if [[ ! "$CONTINUE_EMPTY" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+fi
 
 echo ""
 echo -e "${GREEN}✓ Selected project: $LARGEST_PROJECT ($MAX_EXPERIMENTS experiments)${NC}"
