@@ -66,16 +66,17 @@ echo "Fetching projects list..."
 PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
 
 PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
-echo "Found $PROJECT_COUNT projects. Counting experiments for each (this may take a moment)..."
+echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
 echo ""
 
-# Get experiment counts for each project with progress indicator
+# Get experiment counts for each project using filtered queries with progress indicator
 PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
     COUNTER=0
     while read -r PROJECT_ID; do
         COUNTER=$((COUNTER + 1))
         echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
-        EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${PROJECT_ID}/experiments?format=json" | jq -r '.ResultSet.totalRecords // 0')
+        # Use ?project= filter for more efficient server-side filtering
+        EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
         echo "$EXP_COUNT:$PROJECT_ID"
     done
     echo "" >&2
