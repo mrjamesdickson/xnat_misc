@@ -62,14 +62,24 @@ echo ""
 
 # Step 2: Select project first
 echo -e "${YELLOW}[2/5] Project selection...${NC}"
-echo "Fetching projects and counting experiments..."
+echo "Fetching projects list..."
 PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
 
-# Get experiment counts for each project
-PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | while read -r PROJECT_ID; do
-    EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${PROJECT_ID}/experiments?format=json" | jq -r '.ResultSet.totalRecords // 0')
-    echo "$EXP_COUNT:$PROJECT_ID"
-done | sort -rn)
+PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
+echo "Found $PROJECT_COUNT projects. Counting experiments for each (this may take a moment)..."
+echo ""
+
+# Get experiment counts for each project with progress indicator
+PROJECT_COUNTS=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | {
+    COUNTER=0
+    while read -r PROJECT_ID; do
+        COUNTER=$((COUNTER + 1))
+        echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
+        EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${PROJECT_ID}/experiments?format=json" | jq -r '.ResultSet.totalRecords // 0')
+        echo "$EXP_COUNT:$PROJECT_ID"
+    done
+    echo "" >&2
+} | sort -rn)
 
 echo ""
 echo "Top 10 projects by experiment count:"
