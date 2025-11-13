@@ -123,13 +123,11 @@ fi
 MAX_EXPERIMENTS=$(echo "$MAX_EXPERIMENTS_RESPONSE" | jq -r '.ResultSet.totalRecords // 0')
 
 if [ "$MAX_EXPERIMENTS" = "0" ]; then
-    echo -e "${YELLOW}Warning: Project $LARGEST_PROJECT has 0 experiments${NC}"
+    echo -e "${RED}Error: Project $LARGEST_PROJECT has 0 experiments${NC}"
     echo ""
-    read -p "Continue anyway? (y/yes): " CONTINUE_EMPTY
-    if [[ ! "$CONTINUE_EMPTY" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-        echo "Aborted."
-        exit 0
-    fi
+    echo "This project cannot be used for batch testing."
+    echo "Please select a different project with experiments."
+    exit 1
 fi
 
 echo ""
@@ -297,6 +295,17 @@ echo ""
 # Step 4: Get experiment list
 echo -e "${YELLOW}[4/5] Retrieving experiments from $LARGEST_PROJECT...${NC}"
 EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${LARGEST_PROJECT}/experiments?format=json")
+
+# Validate JSON response
+if ! echo "$EXPERIMENTS" | jq empty 2>/dev/null; then
+    echo -e "${RED}Failed to retrieve experiments from project: $LARGEST_PROJECT${NC}"
+    echo "Response: $EXPERIMENTS"
+    echo ""
+    echo -e "${YELLOW}This usually means the project ID is invalid.${NC}"
+    echo "Please verify the project ID and try again."
+    exit 1
+fi
+
 EXPERIMENT_IDS=$(echo "$EXPERIMENTS" | jq -r '.ResultSet.Result[] | .ID')
 TOTAL_EXPERIMENT_COUNT=$(echo "$EXPERIMENT_IDS" | wc -l | tr -d ' ')
 
