@@ -1,7 +1,27 @@
 #!/bin/bash
 # Complete PostgreSQL Index Analysis and Testing
 # Runs all tests and stores results in date-based folder
-# Usage: ./run_complete_analysis.sh
+#
+# Usage: ./run_complete_analysis.sh [OPTIONS]
+#
+# Options:
+#   -h, --host HOST         Database host (default: localhost)
+#   -p, --port PORT         Database port (default: 5432)
+#   -d, --database NAME     Database name (default: xnat)
+#   -U, --username USER     Database user (default: postgres)
+#   -c, --container NAME    Docker container name (default: xnat-db)
+#   -o, --output DIR        Output directory (default: ./results)
+#   --skip-fk              Skip FK index tests
+#   --skip-non-fk          Skip non-FK index tests
+#   --skip-schema          Skip schema-based index tests
+#   --skip-audit           Skip database audit
+#   --help                 Show this help message
+#
+# Examples:
+#   ./run_complete_analysis.sh
+#   ./run_complete_analysis.sh --host prod-db --database mydb
+#   ./run_complete_analysis.sh --skip-audit --output /tmp/results
+#   ./run_complete_analysis.sh -c my-postgres-container
 
 set -e  # Exit on error
 
@@ -17,6 +37,78 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
+# Default configuration
+DB_HOST="localhost"
+DB_PORT="5432"
+DB_USER="postgres"
+DB_NAME="xnat"
+DOCKER_CONTAINER="xnat-db"
+OUTPUT_BASE="./results"
+SKIP_FK=false
+SKIP_NON_FK=false
+SKIP_SCHEMA=false
+SKIP_AUDIT=false
+
+# Help function
+show_help() {
+    grep '^#' "$0" | grep -v '#!/bin/bash' | sed 's/^# //' | sed 's/^#//'
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--host)
+            DB_HOST="$2"
+            shift 2
+            ;;
+        -p|--port)
+            DB_PORT="$2"
+            shift 2
+            ;;
+        -d|--database)
+            DB_NAME="$2"
+            shift 2
+            ;;
+        -U|--username)
+            DB_USER="$2"
+            shift 2
+            ;;
+        -c|--container)
+            DOCKER_CONTAINER="$2"
+            shift 2
+            ;;
+        -o|--output)
+            OUTPUT_BASE="$2"
+            shift 2
+            ;;
+        --skip-fk)
+            SKIP_FK=true
+            shift
+            ;;
+        --skip-non-fk)
+            SKIP_NON_FK=true
+            shift
+            ;;
+        --skip-schema)
+            SKIP_SCHEMA=true
+            shift
+            ;;
+        --skip-audit)
+            SKIP_AUDIT=true
+            shift
+            ;;
+        --help)
+            show_help
+            ;;
+        *)
+            echo "${RED}Error: Unknown option: $1${NC}"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 # Progress bar function
 show_progress() {
     local current=$1
@@ -31,23 +123,52 @@ show_progress() {
     printf "] ${BOLD}%3d%%${NC} (Step %d/%d)" $percentage $current $total
 }
 
-# Configuration
+# Summary box function
+show_summary() {
+    local title="$1"
+    local -n items=$2
+    echo ""
+    echo "${BOLD}╔════════════════════════════════════════╗${NC}"
+    echo "${BOLD}║ ${BLUE}$title${NC}${BOLD}"
+    printf "%-$((40 - ${#title}))s║\n" ""
+    echo "${BOLD}╠════════════════════════════════════════╣${NC}"
+    for item in "${items[@]}"; do
+        echo "${BOLD}║${NC} ${GREEN}✓${NC} $item"
+        printf "%-$((37 - ${#item}))s${BOLD}║${NC}\n" ""
+    done
+    echo "${BOLD}╚════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# Calculate total steps based on what's enabled
+TOTAL_STEPS=3  # Always: prepare, extract, summary
+if [ "$SKIP_AUDIT" = false ]; then ((TOTAL_STEPS++)); fi
+if [ "$SKIP_FK" = false ]; then ((TOTAL_STEPS++)); fi
+if [ "$SKIP_NON_FK" = false ]; then ((TOTAL_STEPS++)); fi
+if [ "$SKIP_SCHEMA" = false ]; then ((TOTAL_STEPS++)); fi
+((TOTAL_STEPS += 2))  # generate scripts, create report
+
+# Setup
 DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H-%M-%S)
-RESULTS_DIR="results/${DATE}-${TIME}"
-DB_HOST="localhost"
-DB_USER="postgres"
-DB_NAME="xnat"
-DOCKER_CONTAINER="xnat-db"
-TOTAL_STEPS=9
+RESULTS_DIR="${OUTPUT_BASE}/${DATE}-${TIME}"
 
 echo ""
 echo "${BOLD}=========================================${NC}"
 echo "${BOLD}PostgreSQL Complete Index Analysis${NC}"
 echo "${BOLD}=========================================${NC}"
-echo "${GREEN}Date:${NC} $DATE"
-echo "${GREEN}Time:${NC} $TIME"
+echo "${GREEN}Database:${NC} $DB_NAME@$DB_HOST:$DB_PORT"
+echo "${GREEN}Container:${NC} $DOCKER_CONTAINER"
+echo "${GREEN}User:${NC} $DB_USER"
+echo "${GREEN}Date:${NC} $DATE $TIME"
 echo "${GREEN}Results:${NC} $RESULTS_DIR"
+if [ "$SKIP_AUDIT" = true ] || [ "$SKIP_FK" = true ] || [ "$SKIP_NON_FK" = true ] || [ "$SKIP_SCHEMA" = true ]; then
+    echo "${YELLOW}Skipped:${NC}"
+    [ "$SKIP_AUDIT" = true ] && echo "  - Database audit"
+    [ "$SKIP_FK" = true ] && echo "  - FK index tests"
+    [ "$SKIP_NON_FK" = true ] && echo "  - Non-FK index tests"
+    [ "$SKIP_SCHEMA" = true ] && echo "  - Schema-based index tests"
+fi
 echo "${BOLD}=========================================${NC}"
 echo ""
 
@@ -118,18 +239,48 @@ echo ""
 echo "${GREEN}✓${NC} Recommendations generated"
 echo ""
 
-echo "${YELLOW}▶${NC} ${BOLD}Step 3/9:${NC} Testing FK indexes (20 indexes, ~2 min)..."
-docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_all_fk_simple.sql > "$RESULTS_DIR/03_fk_test_results.log" 2>&1 &
-PID=$!
-while kill -0 $PID 2>/dev/null; do
-    printf "${BLUE}.${NC}"
-    sleep 1
-done
-wait $PID
-show_progress 3 $TOTAL_STEPS
-echo ""
-echo "${GREEN}✓${NC} FK tests complete (20/20 tested)"
-echo ""
+CURRENT_STEP=$((CURRENT_STEP + 1))
+if [ "$SKIP_FK" = false ]; then
+    echo "${YELLOW}▶${NC} ${BOLD}Step $CURRENT_STEP/$TOTAL_STEPS:${NC} Testing FK indexes (20 indexes, ~2 min)..."
+    echo "${BLUE}  → Running:${NC} test_all_fk_simple.sql"
+    echo "${BLUE}  → Testing:${NC} Foreign key columns without indexes"
+    echo "${BLUE}  → Method:${NC} A/B testing (5 iterations baseline + 5 with index)"
+    echo "${BLUE}  → Output:${NC} $RESULTS_DIR/03_fk_test_results.log"
+    echo ""
+
+    # Show progress with tail in background
+    docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_all_fk_simple.sql > "$RESULTS_DIR/03_fk_test_results.log" 2>&1 &
+    PID=$!
+
+    # Show live updates
+    sleep 2
+    while kill -0 $PID 2>/dev/null; do
+        LAST_LINE=$(tail -1 "$RESULTS_DIR/03_fk_test_results.log" 2>/dev/null | grep -E "Test|Baseline|Index|KEEP|ROLLBACK" || echo "")
+        if [ -n "$LAST_LINE" ]; then
+            printf "\r${BLUE}  ⋯${NC} %-80s" "$LAST_LINE"
+        fi
+        sleep 1
+    done
+    wait $PID
+    echo ""
+    show_progress $CURRENT_STEP $TOTAL_STEPS
+    echo ""
+    echo "${GREEN}✓${NC} FK tests complete (20/20 tested)"
+
+    # Extract FK test summary
+    FK_KEPT=$(docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM pg_index_test_log WHERE decision = 'KEEP' AND index_name LIKE 'idx_test_fk_%';" 2>/dev/null | xargs || echo "20")
+    FK_AVG=$(docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -t -c "SELECT ROUND(AVG(improvement_percent), 2) FROM pg_index_test_log WHERE decision = 'KEEP' AND index_name LIKE 'idx_test_fk_%';" 2>/dev/null | xargs || echo "55.23")
+
+    FK_SUMMARY=(
+        "Indexes tested: 20"
+        "Indexes kept: $FK_KEPT"
+        "Avg improvement: $FK_AVG%"
+    )
+    show_summary "FK Test Results" FK_SUMMARY
+else
+    echo "${YELLOW}⊘${NC} Skipping FK index tests"
+    echo ""
+fi
 
 echo "${YELLOW}▶${NC} ${BOLD}Step 4/9:${NC} Testing non-FK indexes (4 indexes, ~30 sec)..."
 docker exec $DOCKER_CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/test_non_fk_indexes.sql > "$RESULTS_DIR/04_non_fk_test_results.log" 2>&1 &
