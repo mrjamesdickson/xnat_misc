@@ -657,7 +657,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}=== MONITORING JOB EXECUTION ===${NC}"
     echo ""
-    echo "Waiting for jobs to complete (checking every 30 seconds)..."
+    echo "Waiting for jobs to complete (checking every 10 seconds)..."
     echo "Press Ctrl+C to stop monitoring and continue"
     echo ""
 
@@ -666,7 +666,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     CHECK_COUNT=0
 
     while true; do
-        sleep 30
+        sleep 10
         CHECK_COUNT=$((CHECK_COUNT + 1))
         ELAPSED=$(($(date +%s) - WORKFLOW_START_TIME))
         ELAPSED_MIN=$(awk "BEGIN {printf \"%.1f\", $ELAPSED/60}")
