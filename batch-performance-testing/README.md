@@ -40,9 +40,10 @@ Submits container jobs in batch across multiple experiments.
 - Shows API call syntax before submission
 - Tests with first experiment before full batch
 - Tracks success/failure for each submission
-- Performance metrics (throughput, avg/min/max times)
+- **Monitors job execution until completion** (checks every 30 seconds)
+- Shows real-time status: Running, Complete, Failed, Pending counts
+- Performance metrics (throughput, avg/min/max times, total runtime)
 - Detailed logs saved to `logs/YYYY-MM-DD/`
-- Optional workflow status monitoring
 - **Auto-generates and uploads HTML report if `-r` specified**
 
 **Options:**
@@ -60,8 +61,9 @@ Submits container jobs in batch across multiple experiments.
 3. Retrieve experiments from project
 4. Test launch on first experiment
 5. Batch submit to all experiments
-6. Report success/failure counts
-7. **Generate and upload HTML report (if `-r` specified)**
+6. **Monitor job execution until completion** (30s polling)
+7. Report final status with completion counts
+8. **Generate and upload HTML report (if `-r` specified)**
 
 ### `check_status.sh` - Workflow Status Monitor ✅
 Monitors workflow job status for a project (queries XNAT workflow table).
