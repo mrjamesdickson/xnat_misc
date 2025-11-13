@@ -851,15 +851,15 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
 
     echo -e "${GREEN}✓ Project exists${NC}"
 
-    # Generate filename with timestamp and date-based subfolder
+    # Generate filename with timestamp and run-specific subfolder
     FILENAME=$(basename "$OUTPUT_FILE")
     DATE_FOLDER=$(date '+%Y-%m-%d')
-    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-    UPLOAD_FILENAME="${TIMESTAMP}_${FILENAME}"
-    UPLOAD_PATH="${DATE_FOLDER}/${UPLOAD_FILENAME}"
+    RUN_TIME=$(date '+%H%M%S')
+    RUN_FOLDER="${DATE_FOLDER}/${RUN_TIME}"
+    UPLOAD_PATH="${RUN_FOLDER}/${FILENAME}"
 
     # Upload HTML report to project resource
-    echo -e "${YELLOW}Uploading $FILENAME to ${DATE_FOLDER}/${UPLOAD_FILENAME}...${NC}"
+    echo -e "${YELLOW}Uploading $FILENAME to ${RUN_FOLDER}/...${NC}"
 
     # Debug: show the upload URL
     echo "Upload URL: ${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${UPLOAD_PATH}"
@@ -903,8 +903,7 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
         echo ""
         echo -e "${YELLOW}Uploading original log file...${NC}"
         LOG_FILENAME=$(basename "$LOG_FILE")
-        UPLOAD_LOG_FILENAME="${TIMESTAMP}_${LOG_FILENAME}"
-        UPLOAD_LOG_PATH="${DATE_FOLDER}/${UPLOAD_LOG_FILENAME}"
+        UPLOAD_LOG_PATH="${RUN_FOLDER}/${LOG_FILENAME}"
 
         LOG_UPLOAD_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
             -b "JSESSIONID=$JSESSION" \

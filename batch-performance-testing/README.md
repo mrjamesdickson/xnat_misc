@@ -135,11 +135,12 @@ Converts batch test logs to interactive HTML reports and uploads to XNAT.
 - 📑 Auto-generated index.html for multiple reports
 
 **Upload to XNAT:**
-When `-r` is specified, uploads to project-level resource with date-based organization:
+When `-r` is specified, uploads to project-level resource with run-specific organization:
 - Resource: `BATCH_TESTS`
-- Structure: `YYYY-MM-DD/YYYYMMDD_HHMMSS_batch_test_HHMMSS.html` (report)
-- Structure: `YYYY-MM-DD/YYYYMMDD_HHMMSS_batch_test_HHMMSS.log` (original log)
-- Files organized in date subfolders for easy navigation
+- Structure: `YYYY-MM-DD/HHMMSS/batch_test_HHMMSS.html` (report)
+- Structure: `YYYY-MM-DD/HHMMSS/batch_test_HHMMSS.log` (original log)
+- Each run gets its own subfolder (date/time)
+- Easy to find specific test runs
 - Provides direct link to view in XNAT
 
 ### `check_workflows.sh` - Workflow Monitor
@@ -187,20 +188,26 @@ The `BATCH_TESTS` resource will be created automatically on first upload.
 
 ### Resource Structure
 
-Reports are organized by date in the BATCH_TESTS resource:
+Reports are organized by date and time in the BATCH_TESTS resource:
 ```
 BATCH_TESTS/
 ├── 2025-11-13/
-│   ├── 20251113_140235_batch_test_140235.html
-│   ├── 20251113_140235_batch_test_140235.log
-│   ├── 20251113_140913_batch_test_140913.html
-│   └── 20251113_140913_batch_test_140913.log
+│   ├── 140235/
+│   │   ├── batch_test_140235.html
+│   │   └── batch_test_140235.log
+│   ├── 140913/
+│   │   ├── batch_test_140913.html
+│   │   └── batch_test_140913.log
+│   └── 154425/
+│       ├── batch_test_154425.html
+│       └── batch_test_154425.log
 └── 2025-11-14/
-    ├── 20251114_093021_batch_test_093021.html
-    └── 20251114_093021_batch_test_093021.log
+    └── 093021/
+        ├── batch_test_093021.html
+        └── batch_test_093021.log
 ```
 
-Each test run uploads both:
+Each test run gets its own subfolder with:
 - **HTML report** - Interactive visual dashboard
 - **Text log** - Original raw log file
 
@@ -253,9 +260,10 @@ batch-performance-testing/
 ### XNAT Resource Structure (when uploading with -r)
 ```
 XNAT Project > Resources > BATCH_TESTS/
-└── YYYY-MM-DD/                # Date-based subfolder
-    ├── YYYYMMDD_HHMMSS_batch_test_HHMMSS.html  # HTML report
-    └── YYYYMMDD_HHMMSS_batch_test_HHMMSS.log   # Raw log
+└── YYYY-MM-DD/                          # Date folder
+    └── HHMMSS/                          # Run-specific folder (time)
+        ├── batch_test_HHMMSS.html       # HTML report
+        └── batch_test_HHMMSS.log        # Raw log
 ```
 
 ## API Implementation
