@@ -1,3 +1,4 @@
 logs/
 reports/
 *.html
+.cache/
