@@ -338,6 +338,8 @@ if [ -z "$OUTPUT_FILE" ]; then
     OUTPUT_FILE="${LOG_FILE%.log}.html"
 fi
 
+HISTORY_JSON_FILE="${OUTPUT_FILE%.html}_history.json"
+
 echo "Log file: $LOG_FILE"
 echo "Output: $OUTPUT_FILE"
 echo ""
@@ -1021,13 +1023,58 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             <p>XNAT Batch Performance Testing Tool</p>
         </footer>
     </div>
+EOF
 
+cat >> "$OUTPUT_FILE" <<EOF
+    <script id="history-source" type="application/json" data-history-url="$(basename "$HISTORY_JSON_FILE")">
+EOF
+echo "$HISTORICAL_DATA" >> "$OUTPUT_FILE"
+cat >> "$OUTPUT_FILE" <<'EOF'
+    </script>
+EOF
+
+cat >> "$OUTPUT_FILE" <<'EOF'
     <script>
-        // Historical data from server
-        const historicalData = $HISTORICAL_DATA;
+        let historicalData = [];
+
+        async function loadHistoricalData() {
+            const sourceEl = document.getElementById('history-source');
+            if (!sourceEl) {
+                return [];
+            }
+
+            const inlinePayload = (sourceEl.textContent || '').trim();
+            const historyUrl = sourceEl.dataset.historyUrl;
+
+            if (historyUrl) {
+                try {
+                    const response = await fetch(historyUrl, { cache: 'no-store' });
+                    if (response.ok) {
+                        const remoteData = await response.json();
+                        return Array.isArray(remoteData) ? remoteData : [];
+                    }
+                } catch (error) {
+                    console.warn('Unable to fetch historical data', error);
+                }
+            }
+
+            if (inlinePayload) {
+                try {
+                    const inlineData = JSON.parse(inlinePayload);
+                    return Array.isArray(inlineData) ? inlineData : [];
+                } catch (error) {
+                    console.warn('Unable to parse inline historical data', error);
+                }
+            }
+
+            return [];
+        }
 
         // Set generation date
-        document.getElementById('gen-date').textContent = new Date().toLocaleString();
+        const genDateEl = document.getElementById('gen-date');
+        if (genDateEl) {
+            genDateEl.textContent = new Date().toLocaleString();
+        }
 
         // Function to create SVG line chart
         function createLineChart(svgId, data, color, label, maxY = null) {
@@ -1140,11 +1187,11 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             }
 
             return `<p style="margin-top: 10px; color: #7f8c8d;">
-                <strong>Latest:</strong> \${latest.toFixed(1)}\${unit} |
-                <strong>Avg:</strong> \${avg.toFixed(1)}\${unit} |
-                <strong>Min:</strong> \${min.toFixed(1)}\${unit} |
-                <strong>Max:</strong> \${max.toFixed(1)}\${unit} |
-                <strong class="\${trendClass}">Trend: \${trend} \${trendSymbol}</strong>
+                <strong>Latest:</strong> ${latest.toFixed(1)}${unit} |
+                <strong>Avg:</strong> ${avg.toFixed(1)}${unit} |
+                <strong>Min:</strong> ${min.toFixed(1)}${unit} |
+                <strong>Max:</strong> ${max.toFixed(1)}${unit} |
+                <strong class="${trendClass}">Trend: ${trend} ${trendSymbol}</strong>
             </p>`;
         }
 
@@ -1194,8 +1241,8 @@ cat >> "$OUTPUT_FILE" <<'EOF'
             });
         }
 
-        // Animate progress bars and init charts on load
-        window.addEventListener('load', () => {
+        // Animate progress bars and load history on page load
+        window.addEventListener('load', async () => {
             document.querySelectorAll('.progress-bar-success, .progress-bar-fail').forEach(bar => {
                 const width = bar.style.width;
                 bar.style.width = '0%';
@@ -1204,7 +1251,7 @@ cat >> "$OUTPUT_FILE" <<'EOF'
                 }, 100);
             });
 
-            // Initialize trend charts
+            historicalData = await loadHistoricalData();
             initTrendCharts();
         });
     </script>
@@ -1212,9 +1259,15 @@ cat >> "$OUTPUT_FILE" <<'EOF'
 </html>
 EOF
 
+# Persist historical data JSON for reference/upload
+if ! printf '%s\n' "$HISTORICAL_DATA" | jq '.' > "$HISTORY_JSON_FILE" 2>/dev/null; then
+    echo "[]" > "$HISTORY_JSON_FILE"
+fi
+
 echo -e "${GREEN}✓ HTML report generated successfully${NC}"
 echo ""
 echo "Report saved to: $OUTPUT_FILE"
+echo "Historical data JSON: $HISTORY_JSON_FILE"
 echo ""
 
 # Upload to XNAT if credentials provided
@@ -1294,6 +1347,30 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
             echo "$RESPONSE_BODY" | jq '.'
         fi
         exit 1
+    fi
+
+    # Upload historical JSON alongside report
+    if [ -f "$HISTORY_JSON_FILE" ]; then
+        echo ""
+        echo -e "${YELLOW}Uploading historical performance data...${NC}"
+        HISTORY_JSON_NAME=$(basename "$HISTORY_JSON_FILE")
+        HISTORY_UPLOAD_PATH="${RUN_FOLDER}/${HISTORY_JSON_NAME}"
+
+        HISTORY_UPLOAD_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: application/json" \
+            --data-binary "@${HISTORY_JSON_FILE}" \
+            "${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${HISTORY_UPLOAD_PATH}?format=json&content=BATCH_TEST_HISTORY&inbody=true")
+
+        HISTORY_HTTP_CODE=$(echo "$HISTORY_UPLOAD_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
+        HISTORY_BODY=$(echo "$HISTORY_UPLOAD_RESPONSE" | grep -v "HTTP_CODE:")
+
+        if [ "$HISTORY_HTTP_CODE" = "200" ] || [ "$HISTORY_HTTP_CODE" = "201" ]; then
+            echo -e "${GREEN}✓ Historical data uploaded${NC}"
+        else
+            echo -e "${YELLOW}⚠ Historical data upload failed (HTTP $HISTORY_HTTP_CODE)${NC}"
+            [ -n "$HISTORY_BODY" ] && echo "$HISTORY_BODY"
+        fi
     fi
 
     # Also upload the original log file
