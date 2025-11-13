@@ -588,11 +588,14 @@ Performance Metrics:
 EOF
 
 echo ""
-echo -e "${GREEN}=== BATCH TEST COMPLETE ===${NC}"
+echo -e "${GREEN}=== BATCH SUBMISSION COMPLETE ===${NC}"
 echo ""
 echo "Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS experiments)"
 echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
 echo "Jobs Submitted: $EXPERIMENT_COUNT"
+echo ""
+echo -e "${BLUE}Note: Jobs have been queued and will execute asynchronously.${NC}"
+echo -e "${BLUE}      Check workflow status below or use check_status.sh to monitor.${NC}"
 echo ""
 echo "Results:"
 if [ "$EXPERIMENT_COUNT" -gt 0 ] 2>/dev/null; then
