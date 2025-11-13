@@ -679,12 +679,12 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         fi
 
         # Filter workflows to only those from our batch (after BATCH_START_TIME)
-        BATCH_WORKFLOWS=$(echo "$WORKFLOWS" | jq --arg wrapper "$WRAPPER_ID" --argjson start_time "$BATCH_START_TIME" '
+        BATCH_WORKFLOWS=$(echo "$WORKFLOWS" | jq --arg container "$CONTAINER_NAME" --argjson start_time "$BATCH_START_TIME" '
             if type == "array" then .
             else .items // .workflows // []
             end |
             map(select(
-                (.wrapperId // .wrapper_id // 0 | tostring) == $wrapper and
+                (.pipelineName // .pipeline_name // "") == $container and
                 ((.launchTime // .launch_time // 0) / 1000) >= $start_time
             ))
         ' 2>/dev/null)
