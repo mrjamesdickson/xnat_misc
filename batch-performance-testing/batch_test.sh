@@ -259,27 +259,27 @@ if [ "$ENABLED" != "true" ]; then
         echo "Enabling wrapper ${WRAPPER_ID} for project ${LARGEST_PROJECT}..."
 
         # Enable the wrapper for the project
-        ENABLE_RESULT=$(curl -s -X PUT \
+        ENABLE_RESULT=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
             -b "JSESSIONID=$JSESSION" \
             -H "Content-Type: text/plain" \
             "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/enabled" \
             -d "true")
 
-        # Verify it was enabled
-        VERIFY_RESPONSE=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/enabled" 2>/dev/null)
+        # Check HTTP response code
+        HTTP_CODE=$(echo "$ENABLE_RESULT" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
+        RESPONSE_BODY=$(echo "$ENABLE_RESULT" | grep -v "HTTP_CODE:")
 
-        # Check verification response
-        if echo "$VERIFY_RESPONSE" | jq empty 2>/dev/null; then
-            ENABLED_CHECK=$(echo "$VERIFY_RESPONSE" | jq -r '.["enabled-for-project"] // false')
-        else
-            ENABLED_CHECK="$VERIFY_RESPONSE"
-        fi
-
-        if [ "$ENABLED_CHECK" = "true" ]; then
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
             echo -e "${GREEN}✓ Wrapper enabled successfully${NC}"
         else
             echo -e "${RED}✗ Failed to enable wrapper${NC}"
-            echo "Response: $VERIFY_RESPONSE"
+            echo "HTTP Code: $HTTP_CODE"
+            echo "Response: $RESPONSE_BODY"
+            echo ""
+            if echo "$RESPONSE_BODY" | grep -q "NumberFormatException"; then
+                echo -e "${YELLOW}This usually means the wrapper name/ID is invalid.${NC}"
+                echo "Please verify the wrapper exists: $WRAPPER_ID"
+            fi
             exit 1
         fi
     else
