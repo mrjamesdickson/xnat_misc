@@ -517,7 +517,10 @@ echo ""
 echo "Logging to: $LOG_FILE"
 echo ""
 
+JOB_NUMBER=0
 echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
+    JOB_NUMBER=$((JOB_NUMBER + 1))
+    echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID"
     JOB_START_TIME=$(date +%s.%N)
     # Use form data (not JSON) with context=session parameter
     RESPONSE=$(curl_job_submit -X POST \
