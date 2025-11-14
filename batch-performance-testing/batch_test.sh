@@ -227,18 +227,23 @@ check_site_automation_setting() {
     fi
 
     if [ -z "$automation_value" ]; then
-        AUTOMATION_ENABLED_VALUE="unknown"
-        AUTOMATION_CHECK_NOTE="automation.enabled not found"
         echo -e "${YELLOW}⚠ automation.enabled not found in site config response (${SITE_CONFIG_ENDPOINT_USED:-unknown endpoint}).${NC}"
-        return
+        if disable_site_automation_setting; then
+            if config_response=$(fetch_site_config_json); then
+                automation_value=$(echo "$config_response" | jq -r '.. | ."automation.enabled"? // empty' 2>/dev/null | head -1)
+                if [ -z "$automation_value" ]; then
+                    automation_value=$(echo "$config_response" | jq -r '.. | objects | select(.key == "automation.enabled") | (.value // .text // empty)' 2>/dev/null | head -1)
+                fi
+            fi
+        fi
     fi
 
-    AUTOMATION_ENABLED_VALUE="$automation_value"
-
     if [[ "$automation_value" =~ ^(false|0|False|FALSE)$ ]]; then
+        AUTOMATION_ENABLED_VALUE="false"
         AUTOMATION_CHECK_NOTE="automation.enabled=false"
         echo -e "${GREEN}✓ automation.enabled is disabled at the site level (${SITE_CONFIG_ENDPOINT_USED:-site config})${NC}"
     else
+        AUTOMATION_ENABLED_VALUE="${automation_value:-unknown}"
         echo -e "${RED}✗ automation.enabled is set to '${automation_value}' (expected false)${NC}"
         if disable_site_automation_setting; then
             if config_response=$(fetch_site_config_json); then
@@ -257,8 +262,8 @@ check_site_automation_setting() {
             AUTOMATION_CHECK_NOTE="automation.enabled still ${automation_value:-unknown} after update attempt"
             echo -e "${YELLOW}⚠ Attempted to disable automation.enabled but it remains '${automation_value:-unknown}'.${NC}"
         else
-            AUTOMATION_ENABLED_VALUE="$automation_value"
-            AUTOMATION_CHECK_NOTE="automation.enabled=${automation_value} (update failed)"
+            AUTOMATION_ENABLED_VALUE="${automation_value:-unknown}"
+            AUTOMATION_CHECK_NOTE="automation.enabled=${automation_value:-unknown} (update failed)"
         fi
     fi
 }
