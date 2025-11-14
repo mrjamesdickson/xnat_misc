@@ -18,6 +18,11 @@ API_RETRY_COUNT=${API_RETRY_COUNT:-5}
 API_RETRY_DELAY=${API_RETRY_DELAY:-5}
 JOB_SUBMIT_CONNECT_TIMEOUT=${JOB_SUBMIT_CONNECT_TIMEOUT:-90}
 JOB_SUBMIT_MAX_TIME=${JOB_SUBMIT_MAX_TIME:-600}
+JOB_SUBMIT_RETRY_ATTEMPTS=${JOB_SUBMIT_RETRY_ATTEMPTS:-3}
+JOB_SUBMIT_RETRY_DELAY=${JOB_SUBMIT_RETRY_DELAY:-10}
+
+AUTOMATION_ENABLED_VALUE="unknown"
+AUTOMATION_CHECK_NOTE="Not checked"
 
 curl_api() {
     curl -s \
@@ -37,6 +42,158 @@ curl_job_submit() {
         --retry-delay "$API_RETRY_DELAY" \
         --retry-connrefused \
         "$@"
+}
+
+submit_job_with_retry() {
+    local exp_id="$1"
+    local log_file="$2"
+
+    SUBMIT_RESPONSE=""
+    SUBMIT_HTTP_STATUS=""
+    SUBMIT_STATUS=""
+    SUBMIT_ERROR_REASON=""
+    SUBMIT_WORKFLOW_ID=""
+    SUBMIT_ATTEMPTS=0
+
+    local attempt=1
+
+    while [ $attempt -le "$JOB_SUBMIT_RETRY_ATTEMPTS" ]; do
+        local tmp_file
+        tmp_file=$(mktemp)
+
+        local curl_status
+        curl_status=$(curl_job_submit \
+            -o "$tmp_file" \
+            -w "%{http_code}" \
+            -X POST \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
+            -d "context=session&session=${exp_id}")
+
+        local response
+        response=$(cat "$tmp_file")
+        rm -f "$tmp_file"
+
+        SUBMIT_ATTEMPTS=$attempt
+        SUBMIT_HTTP_STATUS="${curl_status:-000}"
+        SUBMIT_RESPONSE="$response"
+
+        local should_retry=false
+        local retry_reason=""
+
+        if [ "$SUBMIT_HTTP_STATUS" = "000" ]; then
+            should_retry=true
+            retry_reason="Connection error"
+        elif [[ "$SUBMIT_HTTP_STATUS" =~ ^[0-9]+$ ]] && [ "$SUBMIT_HTTP_STATUS" -ge 500 ]; then
+            should_retry=true
+            retry_reason="HTTP $SUBMIT_HTTP_STATUS"
+        fi
+
+        if echo "$response" | grep -qi "<!doctype html"; then
+            SUBMIT_STATUS="html_error"
+            SUBMIT_ERROR_REASON=$(echo "$response" | grep -oP '(?<=<title>)[^<]+' | head -1)
+            [ -z "$SUBMIT_ERROR_REASON" ] && SUBMIT_ERROR_REASON="HTML error page"
+            should_retry=true
+            [ -z "$retry_reason" ] && retry_reason="$SUBMIT_ERROR_REASON"
+        elif echo "$response" | jq empty >/dev/null 2>&1; then
+            local status_value
+            status_value=$(echo "$response" | jq -r '.status // "unknown"')
+            if [ "$status_value" = "success" ]; then
+                SUBMIT_STATUS="success"
+                SUBMIT_WORKFLOW_ID=$(echo "$response" | jq -r '.["workflow-id"] // "pending"')
+                SUBMIT_ERROR_REASON=""
+                break
+            else
+                SUBMIT_STATUS="api_error"
+                SUBMIT_ERROR_REASON=$(echo "$response" | jq -r '.message // .error // "Unknown error"')
+                should_retry=true
+                [ -z "$retry_reason" ] && retry_reason="$SUBMIT_ERROR_REASON"
+            fi
+        else
+            SUBMIT_STATUS="invalid_response"
+            SUBMIT_ERROR_REASON="Invalid response"
+            should_retry=true
+            [ -z "$retry_reason" ] && retry_reason="$SUBMIT_ERROR_REASON"
+        fi
+
+        if [ "$SUBMIT_STATUS" = "success" ]; then
+            break
+        fi
+
+        if [ "$should_retry" = true ] && [ $attempt -lt "$JOB_SUBMIT_RETRY_ATTEMPTS" ]; then
+            echo -e "${YELLOW}Attempt $attempt failed for $exp_id: ${retry_reason}. Retrying in ${JOB_SUBMIT_RETRY_DELAY}s...${NC}"
+            if [ -n "$log_file" ]; then
+                local retry_timestamp
+                retry_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+                cat >> "$log_file" <<EOF
+[$retry_timestamp] RETRY - $exp_id
+  Attempt: $attempt/$JOB_SUBMIT_RETRY_ATTEMPTS
+  HTTP Status: ${SUBMIT_HTTP_STATUS:-unknown}
+  Reason: $retry_reason
+EOF
+            fi
+            sleep "$JOB_SUBMIT_RETRY_DELAY"
+            attempt=$((attempt + 1))
+            continue
+        fi
+
+        break
+    done
+
+    if [ "$SUBMIT_STATUS" != "success" ] && [ -z "$SUBMIT_ERROR_REASON" ]; then
+        SUBMIT_ERROR_REASON="Submission failed"
+    fi
+}
+
+check_site_automation_setting() {
+    echo -e "${YELLOW}Checking site automation settings...${NC}"
+    local endpoints=(
+        "/xapi/siteConfig"
+        "/xapi/siteConfig/config"
+        "/data/config/siteConfig"
+    )
+
+    local config_response=""
+    local endpoint_used=""
+
+    for endpoint in "${endpoints[@]}"; do
+        config_response=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}${endpoint}" -H "Accept: application/json" 2>/dev/null)
+        if [ -n "$config_response" ] && echo "$config_response" | jq empty >/dev/null 2>&1; then
+            endpoint_used="$endpoint"
+            break
+        fi
+    done
+
+    if [ -z "$config_response" ]; then
+        AUTOMATION_ENABLED_VALUE="unknown"
+        AUTOMATION_CHECK_NOTE="Unable to retrieve site configuration"
+        echo -e "${YELLOW}⚠ Unable to retrieve site configuration; skipping automation.enabled check.${NC}"
+        return
+    fi
+
+    local automation_value=""
+    automation_value=$(echo "$config_response" | jq -r '.. | ."automation.enabled"? // empty' 2>/dev/null | head -1)
+    if [ -z "$automation_value" ]; then
+        automation_value=$(echo "$config_response" | jq -r '.. | objects | select(.key == "automation.enabled") | (.value // .text // empty)' 2>/dev/null | head -1)
+    fi
+
+    if [ -z "$automation_value" ]; then
+        AUTOMATION_ENABLED_VALUE="unknown"
+        AUTOMATION_CHECK_NOTE="automation.enabled not found"
+        echo -e "${YELLOW}⚠ automation.enabled not found in site config response (${endpoint_used:-unknown endpoint}).${NC}"
+        return
+    fi
+
+    AUTOMATION_ENABLED_VALUE="$automation_value"
+
+    if [[ "$automation_value" =~ ^(false|0|False|FALSE)$ ]]; then
+        AUTOMATION_CHECK_NOTE="automation.enabled=false"
+        echo -e "${GREEN}✓ automation.enabled is disabled at the site level (${endpoint_used:-site config})${NC}"
+    else
+        AUTOMATION_CHECK_NOTE="automation.enabled=${automation_value}"
+        echo -e "${RED}✗ automation.enabled is set to '${automation_value}' (expected false)${NC}"
+    fi
 }
 
 # Usage
@@ -91,6 +248,9 @@ if [ -z "$JSESSION" ]; then
 fi
 
 echo -e "${GREEN}✓ Authenticated (JSESSION: ${JSESSION:0:20}...)${NC}"
+echo ""
+
+check_site_automation_setting
 echo ""
 
 # Step 2: Select project first (skip if -j provided)
@@ -464,16 +624,21 @@ echo ""
 # Test first experiment to verify the call works
 FIRST_EXP=$(echo "$EXPERIMENT_IDS" | head -1)
 echo "Testing with first experiment: $FIRST_EXP"
-TEST_RESPONSE=$(curl_job_submit -X POST \
-    -b "JSESSIONID=$JSESSION" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
-    -d "context=session&session=${FIRST_EXP}")
+submit_job_with_retry "$FIRST_EXP" ""
+
+TEST_RESPONSE="$SUBMIT_RESPONSE"
 
 echo ""
-echo "Test response:"
+echo "Test response (HTTP ${SUBMIT_HTTP_STATUS:-unknown} after ${SUBMIT_ATTEMPTS:-1} attempt(s)):"
 echo "$TEST_RESPONSE" | jq '.' 2>/dev/null || echo "$TEST_RESPONSE"
 echo ""
+
+if [ "$SUBMIT_STATUS" = "success" ]; then
+    echo -e "${GREEN}Test submission succeeded (workflow: $SUBMIT_WORKFLOW_ID)${NC}"
+else
+    echo -e "${RED}Test submission failed: ${SUBMIT_ERROR_REASON:-Unknown error} (HTTP ${SUBMIT_HTTP_STATUS:-unknown})${NC}"
+fi
+
 
 read -p "Test successful? Continue with batch? (y/yes): " CONTINUE_BATCH
 
@@ -509,6 +674,8 @@ Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS total experiments)
 Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
 Experiments to Process: $EXPERIMENT_COUNT
 Max Jobs Limit: ${MAX_JOBS:-None (processing all)}
+Site Automation Enabled: ${AUTOMATION_ENABLED_VALUE}
+Automation Check Note: ${AUTOMATION_CHECK_NOTE}
 =================================================================
 
 EOF
@@ -522,71 +689,45 @@ echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
     JOB_NUMBER=$((JOB_NUMBER + 1))
     echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID"
     JOB_START_TIME=$(date +%s.%N)
-    # Use form data (not JSON) with context=session parameter
-    RESPONSE=$(curl_job_submit -X POST \
-        -b "JSESSIONID=$JSESSION" \
-        -H "Content-Type: application/x-www-form-urlencoded" \
-        "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
-        -d "context=session&session=${EXP_ID}")
+    # Use form data (not JSON) with context=session parameter and retry logic
+    submit_job_with_retry "$EXP_ID" "$LOG_FILE"
 
     JOB_END_TIME=$(date +%s.%N)
     JOB_DURATION=$(echo "$JOB_END_TIME - $JOB_START_TIME" | bc)
     JOB_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # Check if response is HTML (error page) or JSON
-    if echo "$RESPONSE" | grep -q "<!doctype html"; then
-        ERROR_TITLE=$(echo "$RESPONSE" | grep -oP '(?<=<title>)[^<]+' | head -1)
-        echo -e "${RED}✗${NC} $EXP_ID: $ERROR_TITLE"
-        echo "FAIL" >> "$RESULTS_FILE"
+    ATTEMPT_NOTE=""
+    if [[ "$SUBMIT_ATTEMPTS" =~ ^[0-9]+$ ]] && [ "$SUBMIT_ATTEMPTS" -gt 1 ]; then
+        ATTEMPT_NOTE=", after ${SUBMIT_ATTEMPTS} attempts"
+    fi
+
+    if [ "$SUBMIT_STATUS" = "success" ]; then
+        echo -e "${GREEN}✓${NC} $EXP_ID (workflow: $SUBMIT_WORKFLOW_ID${ATTEMPT_NOTE})"
+        echo "SUCCESS" >> "$RESULTS_FILE"
         echo "$JOB_DURATION" >> "$TIMING_FILE"
 
-        # Log to file
         cat >> "$LOG_FILE" <<EOF
-[$JOB_TIMESTAMP] FAIL - $EXP_ID
-  Duration: ${JOB_DURATION}s
-  Error: $ERROR_TITLE
-
-EOF
-    elif echo "$RESPONSE" | jq empty 2>/dev/null; then
-        # Valid JSON response - check for success
-        STATUS=$(echo "$RESPONSE" | jq -r '.status // "unknown"')
-        if [ "$STATUS" = "success" ]; then
-            WORKFLOW_ID=$(echo "$RESPONSE" | jq -r '.["workflow-id"] // "pending"')
-            echo -e "${GREEN}✓${NC} $EXP_ID (workflow: $WORKFLOW_ID)"
-            echo "SUCCESS" >> "$RESULTS_FILE"
-            echo "$JOB_DURATION" >> "$TIMING_FILE"
-
-            # Log to file
-            cat >> "$LOG_FILE" <<EOF
 [$JOB_TIMESTAMP] SUCCESS - $EXP_ID
   Duration: ${JOB_DURATION}s
-  Workflow ID: $WORKFLOW_ID
+  Workflow ID: $SUBMIT_WORKFLOW_ID
+  Attempts: $SUBMIT_ATTEMPTS
 
 EOF
-        else
-            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.message // .error // "Unknown error"')
-            echo -e "${RED}✗${NC} $EXP_ID: $ERROR_MSG"
-            echo "FAIL" >> "$RESULTS_FILE"
-            echo "$JOB_DURATION" >> "$TIMING_FILE"
-
-            # Log to file
-            cat >> "$LOG_FILE" <<EOF
-[$JOB_TIMESTAMP] FAIL - $EXP_ID
-  Duration: ${JOB_DURATION}s
-  Error: $ERROR_MSG
-
-EOF
-        fi
     else
-        echo -e "${RED}✗${NC} $EXP_ID: Invalid response"
+        ERROR_MESSAGE="${SUBMIT_ERROR_REASON:-Invalid response}"
+        if [[ "$SUBMIT_HTTP_STATUS" =~ ^[0-9]+$ ]]; then
+            ERROR_MESSAGE="$ERROR_MESSAGE (HTTP $SUBMIT_HTTP_STATUS)"
+        fi
+        echo -e "${RED}✗${NC} $EXP_ID: $ERROR_MESSAGE${ATTEMPT_NOTE}"
         echo "FAIL" >> "$RESULTS_FILE"
         echo "$JOB_DURATION" >> "$TIMING_FILE"
 
-        # Log to file
         cat >> "$LOG_FILE" <<EOF
 [$JOB_TIMESTAMP] FAIL - $EXP_ID
   Duration: ${JOB_DURATION}s
-  Error: Invalid response
+  Attempts: $SUBMIT_ATTEMPTS
+  HTTP Status: ${SUBMIT_HTTP_STATUS:-unknown}
+  Error: $ERROR_MESSAGE
 
 EOF
     fi

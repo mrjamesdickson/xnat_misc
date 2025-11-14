@@ -40,11 +40,13 @@ Submits container jobs in batch across multiple experiments.
 - Shows API call syntax before submission
 - Tests with first experiment before full batch
 - Tracks success/failure for each submission
+- Retries job submissions (e.g., HTTP 503/service errors) with logging before giving up
 - **Monitors job execution until completion** (checks every 10 seconds)
 - Shows real-time status: Running, Complete, Failed, Pending counts
 - Performance metrics (throughput, avg/min/max times, total runtime)
 - Detailed logs saved to `logs/YYYY-MM-DD/`
 - **Auto-generates and uploads HTML report if `-r` specified**
+- Verifies the site-level `automation.enabled` flag is `false` before batch runs
 
 **Options:**
 - `-h` XNAT host (required)
