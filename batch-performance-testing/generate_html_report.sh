@@ -12,6 +12,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Upload/retry configuration (override via env vars if needed)
+UPLOAD_MAX_TIME=${UPLOAD_MAX_TIME:-600}
+UPLOAD_CONNECT_TIMEOUT=${UPLOAD_CONNECT_TIMEOUT:-30}
+UPLOAD_RETRY_COUNT=${UPLOAD_RETRY_COUNT:-5}
+UPLOAD_RETRY_DELAY=${UPLOAD_RETRY_DELAY:-20}
+
 # Usage
 usage() {
     echo "Usage: $0 [-l <LOG_FILE>] [-o <OUTPUT_FILE>] [-a] [-h <XNAT_HOST>] [-u <USERNAME>] [-p <PASSWORD>] [-r <REPORT_PROJECT>]"
@@ -107,6 +113,53 @@ get_history() {
     local key="${host}|${project}|${container}"
 
     jq -r --arg key "$key" '.[$key] // []' "$HISTORY_DB"
+}
+
+# Upload helper with retry logic
+upload_with_retry() {
+    local file_path="$1"
+    local content_type="$2"
+    local upload_path="$3"
+    local content_label="$4"
+    local resource_label="$5"
+
+    if [ ! -f "$file_path" ]; then
+        echo -e "  ${YELLOW}⚠ Skipping ${resource_label} upload; file not found (${file_path})${NC}"
+        return 1
+    fi
+
+    local attempt=1
+    while [ $attempt -le $UPLOAD_RETRY_COUNT ]; do
+        echo -e "  Attempt ${attempt}/${UPLOAD_RETRY_COUNT}..."
+        local response http_code body
+        response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: $content_type" \
+            --connect-timeout "$UPLOAD_CONNECT_TIMEOUT" \
+            --max-time "$UPLOAD_MAX_TIME" \
+            --data-binary "@${file_path}" \
+            "${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${upload_path}?format=json&content=${content_label}&inbody=true")
+
+        http_code=$(echo "$response" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
+        body=$(echo "$response" | grep -v "HTTP_CODE:")
+
+        if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+            echo -e "  ${GREEN}✓ ${resource_label} uploaded${NC}"
+            return 0
+        fi
+
+        echo -e "  ${YELLOW}⚠ ${resource_label} upload failed (HTTP ${http_code})${NC}"
+        [ -n "$body" ] && echo "    $body"
+
+        if [ $attempt -lt $UPLOAD_RETRY_COUNT ]; then
+            echo "  Retrying in ${UPLOAD_RETRY_DELAY}s..."
+            sleep "$UPLOAD_RETRY_DELAY"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    echo -e "  ${RED}✗ Failed to upload ${resource_label} after ${UPLOAD_RETRY_COUNT} attempts${NC}"
+    return 1
 }
 
 # If -a flag is set, process all logs
@@ -1311,25 +1364,9 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
 
     # Upload HTML report to project resource
     echo -e "${YELLOW}Uploading $FILENAME to ${RUN_FOLDER}/...${NC}"
-
-    # Debug: show the upload URL
     echo "Upload URL: ${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${UPLOAD_PATH}"
 
-    UPLOAD_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
-        -b "JSESSIONID=$JSESSION" \
-        -H "Content-Type: text/html" \
-        --data-binary "@${OUTPUT_FILE}" \
-        "${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${UPLOAD_PATH}?format=json&content=BATCH_TEST_REPORT&inbody=true")
-
-    # Extract HTTP code and response body
-    HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-    RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | grep -v "HTTP_CODE:")
-
-    echo "HTTP Code: $HTTP_CODE"
-
-    # Check if upload was successful (200 or 201)
-    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-        echo -e "${GREEN}✓ Upload successful${NC}"
+    if upload_with_retry "$OUTPUT_FILE" "text/html" "$UPLOAD_PATH" "BATCH_TEST_REPORT" "HTML report"; then
         echo ""
         echo "Report uploaded to:"
         echo "  ${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${UPLOAD_PATH}"
@@ -1337,15 +1374,6 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
         echo "View in XNAT:"
         echo "  ${XNAT_HOST}/app/action/DisplayItemAction/search_element/xnat:projectData/search_field/xnat:projectData.ID/search_value/${REPORT_PROJECT}/popup/false"
     else
-        echo -e "${RED}Upload failed${NC}"
-        echo "HTTP Code: $HTTP_CODE"
-        echo "Response: $RESPONSE_BODY"
-
-        # Try to parse error message if it's JSON
-        if echo "$RESPONSE_BODY" | jq empty 2>/dev/null; then
-            echo "Error details:"
-            echo "$RESPONSE_BODY" | jq '.'
-        fi
         exit 1
     fi
 
@@ -1356,20 +1384,8 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
         HISTORY_JSON_NAME=$(basename "$HISTORY_JSON_FILE")
         HISTORY_UPLOAD_PATH="${RUN_FOLDER}/${HISTORY_JSON_NAME}"
 
-        HISTORY_UPLOAD_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
-            -b "JSESSIONID=$JSESSION" \
-            -H "Content-Type: application/json" \
-            --data-binary "@${HISTORY_JSON_FILE}" \
-            "${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${HISTORY_UPLOAD_PATH}?format=json&content=BATCH_TEST_HISTORY&inbody=true")
-
-        HISTORY_HTTP_CODE=$(echo "$HISTORY_UPLOAD_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-        HISTORY_BODY=$(echo "$HISTORY_UPLOAD_RESPONSE" | grep -v "HTTP_CODE:")
-
-        if [ "$HISTORY_HTTP_CODE" = "200" ] || [ "$HISTORY_HTTP_CODE" = "201" ]; then
-            echo -e "${GREEN}✓ Historical data uploaded${NC}"
-        else
-            echo -e "${YELLOW}⚠ Historical data upload failed (HTTP $HISTORY_HTTP_CODE)${NC}"
-            [ -n "$HISTORY_BODY" ] && echo "$HISTORY_BODY"
+        if ! upload_with_retry "$HISTORY_JSON_FILE" "application/json" "$HISTORY_UPLOAD_PATH" "BATCH_TEST_HISTORY" "Historical data"; then
+            echo -e "${YELLOW}⚠ Proceeding without uploading historical JSON${NC}"
         fi
     fi
 
@@ -1380,18 +1396,8 @@ if [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && [ -n "$REP
         LOG_FILENAME=$(basename "$LOG_FILE")
         UPLOAD_LOG_PATH="${RUN_FOLDER}/${LOG_FILENAME}"
 
-        LOG_UPLOAD_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
-            -b "JSESSIONID=$JSESSION" \
-            -H "Content-Type: text/plain" \
-            --data-binary "@${LOG_FILE}" \
-            "${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS/files/${UPLOAD_LOG_PATH}?format=json&content=BATCH_TEST_LOG&inbody=true")
-
-        LOG_HTTP_CODE=$(echo "$LOG_UPLOAD_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-
-        if [ "$LOG_HTTP_CODE" = "200" ] || [ "$LOG_HTTP_CODE" = "201" ]; then
-            echo -e "${GREEN}✓ Log file uploaded${NC}"
-        else
-            echo -e "${YELLOW}⚠ Log upload failed (HTTP $LOG_HTTP_CODE)${NC}"
+        if ! upload_with_retry "$LOG_FILE" "text/plain" "$UPLOAD_LOG_PATH" "BATCH_TEST_LOG" "Log file"; then
+            echo -e "${YELLOW}⚠ Log upload failed after retries${NC}"
         fi
     fi
 

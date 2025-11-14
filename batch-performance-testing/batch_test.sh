@@ -11,6 +11,34 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Network timeout/retry configuration (override via environment variables)
+API_CONNECT_TIMEOUT=${API_CONNECT_TIMEOUT:-60}
+API_MAX_TIME=${API_MAX_TIME:-300}
+API_RETRY_COUNT=${API_RETRY_COUNT:-5}
+API_RETRY_DELAY=${API_RETRY_DELAY:-5}
+JOB_SUBMIT_CONNECT_TIMEOUT=${JOB_SUBMIT_CONNECT_TIMEOUT:-90}
+JOB_SUBMIT_MAX_TIME=${JOB_SUBMIT_MAX_TIME:-600}
+
+curl_api() {
+    curl -s \
+        --connect-timeout "$API_CONNECT_TIMEOUT" \
+        --max-time "$API_MAX_TIME" \
+        --retry "$API_RETRY_COUNT" \
+        --retry-delay "$API_RETRY_DELAY" \
+        --retry-connrefused \
+        "$@"
+}
+
+curl_job_submit() {
+    curl -s \
+        --connect-timeout "$JOB_SUBMIT_CONNECT_TIMEOUT" \
+        --max-time "$JOB_SUBMIT_MAX_TIME" \
+        --retry "$API_RETRY_COUNT" \
+        --retry-delay "$API_RETRY_DELAY" \
+        --retry-connrefused \
+        "$@"
+}
+
 # Usage
 usage() {
     echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]"
@@ -55,7 +83,7 @@ echo ""
 
 # Step 1: Authenticate
 echo -e "${YELLOW}[1/5] Authenticating...${NC}"
-JSESSION=$(curl -s -u "${USERNAME}:${PASSWORD}" "${XNAT_HOST}/data/JSESSION")
+JSESSION=$(curl_api -u "${USERNAME}:${PASSWORD}" "${XNAT_HOST}/data/JSESSION")
 
 if [ -z "$JSESSION" ]; then
     echo -e "${RED}Failed to authenticate${NC}"
@@ -88,7 +116,7 @@ if [ -z "$LARGEST_PROJECT" ]; then
         PROJECT_COUNTS=$(cat "$CACHE_FILE")
     else
         echo "Fetching projects list..."
-        PROJECTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
+        PROJECTS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects?format=json")
 
         PROJECT_COUNT=$(echo "$PROJECTS" | jq -r '.ResultSet.Result[] | .ID' | wc -l | tr -d ' ')
         echo "Found $PROJECT_COUNT projects. Counting experiments for each..."
@@ -101,7 +129,7 @@ if [ -z "$LARGEST_PROJECT" ]; then
                 COUNTER=$((COUNTER + 1))
                 echo -ne "\r${YELLOW}Progress: $COUNTER/$PROJECT_COUNT projects checked...${NC}  " >&2
                 # Use ?project= filter for more efficient server-side filtering
-                EXP_COUNT=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
+                EXP_COUNT=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${PROJECT_ID}&format=json" | jq -r '.ResultSet.totalRecords // 0')
                 echo "$EXP_COUNT:$PROJECT_ID"
             done
             echo "" >&2
@@ -136,7 +164,7 @@ else
 fi
 
 # Get experiment count for selected project
-MAX_EXPERIMENTS_RESPONSE=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${LARGEST_PROJECT}&format=json")
+MAX_EXPERIMENTS_RESPONSE=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments?project=${LARGEST_PROJECT}&format=json")
 
 # Check if response is valid JSON
 if ! echo "$MAX_EXPERIMENTS_RESPONSE" | jq empty 2>/dev/null; then
@@ -169,7 +197,7 @@ if [ -z "$CONTAINER_NAME" ]; then
     # Try multiple endpoints for container commands
     COMMANDS=""
     for endpoint in "/xapi/commands" "/data/services/containers/commands" "/REST/services/containers/commands"; do
-        COMMANDS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}${endpoint}" -H "Accept: application/json")
+        COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}${endpoint}" -H "Accept: application/json")
 
         # Check if valid JSON and not 404
         if echo "$COMMANDS" | jq empty 2>/dev/null && [ "$COMMANDS" != "[]" ] && [ "$COMMANDS" != "null" ]; then
@@ -207,7 +235,7 @@ if [ -z "$CONTAINER_NAME" ]; then
             "\(.id)\t\(.name)\t\(.contexts | join(","))"
         ' | while IFS=$'\t' read -r wrapper_id wrapper_name contexts; do
             # Check if this wrapper is enabled for the selected project
-            enabled_resp=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${wrapper_id}/enabled" 2>/dev/null)
+            enabled_resp=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${wrapper_id}/enabled" 2>/dev/null)
 
             # Parse response (JSON or plain text)
             if echo "$enabled_resp" | jq empty 2>/dev/null; then
@@ -250,7 +278,7 @@ echo -e "${YELLOW}Verifying wrapper is enabled for project ${LARGEST_PROJECT}...
 
 # If COMMANDS not already fetched, fetch it
 if [ -z "$COMMANDS" ]; then
-    COMMANDS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
+    COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
 fi
 
 # Search for wrapper by name or ID in all commands
@@ -267,7 +295,7 @@ if [ -z "$WRAPPER_ID" ]; then
 fi
 
 # Check if enabled for this project
-ENABLED_RESPONSE=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/enabled" 2>/dev/null)
+ENABLED_RESPONSE=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/enabled" 2>/dev/null)
 
 # Check if response is JSON (newer XNAT) or plain text (older XNAT)
 if echo "$ENABLED_RESPONSE" | jq empty 2>/dev/null; then
@@ -286,7 +314,7 @@ if [ "$ENABLED" != "true" ]; then
         echo "Enabling wrapper ${WRAPPER_ID} for project ${LARGEST_PROJECT}..."
 
         # Enable the wrapper for the project
-        ENABLE_RESULT=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT \
+        ENABLE_RESULT=$(curl_api -w "\nHTTP_CODE:%{http_code}" -X PUT \
             -b "JSESSIONID=$JSESSION" \
             -H "Content-Type: text/plain" \
             "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/enabled" \
@@ -321,7 +349,7 @@ echo ""
 
 # Step 4: Get experiment list
 echo -e "${YELLOW}[4/5] Retrieving experiments from $LARGEST_PROJECT...${NC}"
-EXPERIMENTS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${LARGEST_PROJECT}/experiments?format=json")
+EXPERIMENTS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${LARGEST_PROJECT}/experiments?format=json")
 
 # Validate JSON response
 if ! echo "$EXPERIMENTS" | jq empty 2>/dev/null; then
@@ -398,7 +426,7 @@ echo -e "${YELLOW}Finding wrapper-id for container '${CONTAINER_NAME}'...${NC}"
 
 # If COMMANDS not already fetched, fetch it
 if [ -z "$COMMANDS" ]; then
-    COMMANDS=$(curl -s -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
+    COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
 fi
 
 # Search for wrapper by name or ID in all commands
@@ -436,7 +464,7 @@ echo ""
 # Test first experiment to verify the call works
 FIRST_EXP=$(echo "$EXPERIMENT_IDS" | head -1)
 echo "Testing with first experiment: $FIRST_EXP"
-TEST_RESPONSE=$(curl -s -X POST \
+TEST_RESPONSE=$(curl_job_submit -X POST \
     -b "JSESSIONID=$JSESSION" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
@@ -492,7 +520,7 @@ echo ""
 echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
     JOB_START_TIME=$(date +%s.%N)
     # Use form data (not JSON) with context=session parameter
-    RESPONSE=$(curl -s -X POST \
+    RESPONSE=$(curl_job_submit -X POST \
         -b "JSESSIONID=$JSESSION" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
@@ -703,11 +731,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         MAX_PAGES=10
 
         while [ $PAGE -le $MAX_PAGES ]; do
-            PAGE_WORKFLOWS=$(curl -s -X POST \
+            PAGE_WORKFLOWS=$(curl_api -X POST \
                 -b "JSESSIONID=$JSESSION" \
                 -H "Content-Type: application/json" \
                 -H "X-Requested-With: XMLHttpRequest" \
-                --max-time 30 \
                 "${XNAT_HOST}/xapi/workflows" \
                 -d "{\"page\":$PAGE,\"id\":\"$LARGEST_PROJECT\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}" 2>/dev/null)
 
@@ -846,11 +873,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ] && [ -z "$FINAL_WORKFLOWS" ]; then
 
             WORKFLOW_QUERY="{\"page\":$PAGE,\"id\":\"$LARGEST_PROJECT\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}"
 
-            WORKFLOWS=$(curl -s -X POST \
+            WORKFLOWS=$(curl_api -X POST \
                 -b "JSESSIONID=$JSESSION" \
                 -H "Content-Type: application/json" \
                 -H "X-Requested-With: XMLHttpRequest" \
-                --max-time 30 \
                 "${XNAT_HOST}/xapi/workflows" \
                 -d "$WORKFLOW_QUERY" 2>/dev/null)
 
