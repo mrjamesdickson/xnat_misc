@@ -92,9 +92,7 @@ check_status() {
     # Fetch all pages (API returns 50 results per page)
     ALL_WORKFLOWS="[]"
     PAGE=1
-    MAX_PAGES=20  # Safety limit to prevent infinite loop
-
-    while [ $PAGE -le $MAX_PAGES ]; do
+    while true; do
         echo -ne "\r${YELLOW}Fetching page $PAGE...${NC}  "
 
         # Build POST payload for workflows query
