@@ -23,6 +23,7 @@ JOB_SUBMIT_RETRY_DELAY=${JOB_SUBMIT_RETRY_DELAY:-10}
 
 AUTOMATION_ENABLED_VALUE="unknown"
 AUTOMATION_CHECK_NOTE="Not checked"
+SITE_CONFIG_ENDPOINT_USED=""
 
 curl_api() {
     curl -s \
@@ -146,26 +147,73 @@ EOF
     fi
 }
 
-check_site_automation_setting() {
-    echo -e "${YELLOW}Checking site automation settings...${NC}"
+fetch_site_config_json() {
+    SITE_CONFIG_ENDPOINT_USED=""
     local endpoints=(
         "/xapi/siteConfig"
         "/xapi/siteConfig/config"
         "/data/config/siteConfig"
     )
 
-    local config_response=""
-    local endpoint_used=""
+    local response=""
 
     for endpoint in "${endpoints[@]}"; do
-        config_response=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}${endpoint}" -H "Accept: application/json" 2>/dev/null)
-        if [ -n "$config_response" ] && echo "$config_response" | jq empty >/dev/null 2>&1; then
-            endpoint_used="$endpoint"
-            break
+        response=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}${endpoint}" -H "Accept: application/json" 2>/dev/null)
+        if [ -n "$response" ] && echo "$response" | jq empty >/dev/null 2>&1; then
+            SITE_CONFIG_ENDPOINT_USED="$endpoint"
+            echo "$response"
+            return 0
         fi
     done
 
-    if [ -z "$config_response" ]; then
+    return 1
+}
+
+disable_site_automation_setting() {
+    echo -e "${YELLOW}Attempting to set automation.enabled=false via site configuration...${NC}"
+
+    local attempts=(
+        "PUT|/xapi/siteConfig/automation.enabled|text/plain|false"
+        "POST|/xapi/siteConfig/config|application/json|{\"automation.enabled\":\"false\"}"
+        "PUT|/data/config/siteConfig|application/json|{\"automation.enabled\":\"false\"}"
+    )
+
+    for attempt in "${attempts[@]}"; do
+        IFS='|' read -r method endpoint content_type body <<< "$attempt"
+
+        local tmp_file
+        tmp_file=$(mktemp)
+
+        local http_code
+        http_code=$(curl_api \
+            -o "$tmp_file" \
+            -w "%{http_code}" \
+            -X "$method" \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: $content_type" \
+            "${XNAT_HOST}${endpoint}" \
+            -d "$body" 2>/dev/null)
+
+        local resp_body
+        resp_body=$(cat "$tmp_file")
+        rm -f "$tmp_file"
+
+        if [[ "$http_code" =~ ^(200|201|204)$ ]]; then
+            echo -e "${GREEN}✓ automation.enabled set to false using ${endpoint}${NC}"
+            return 0
+        fi
+
+        echo -e "${YELLOW}Attempt to update automation.enabled via ${endpoint} returned HTTP ${http_code}.${NC}"
+    done
+
+    echo -e "${RED}✗ Unable to set automation.enabled=false via known endpoints${NC}"
+    return 1
+}
+
+check_site_automation_setting() {
+    echo -e "${YELLOW}Checking site automation settings...${NC}"
+    local config_response
+    if ! config_response=$(fetch_site_config_json); then
         AUTOMATION_ENABLED_VALUE="unknown"
         AUTOMATION_CHECK_NOTE="Unable to retrieve site configuration"
         echo -e "${YELLOW}⚠ Unable to retrieve site configuration; skipping automation.enabled check.${NC}"
@@ -181,7 +229,7 @@ check_site_automation_setting() {
     if [ -z "$automation_value" ]; then
         AUTOMATION_ENABLED_VALUE="unknown"
         AUTOMATION_CHECK_NOTE="automation.enabled not found"
-        echo -e "${YELLOW}⚠ automation.enabled not found in site config response (${endpoint_used:-unknown endpoint}).${NC}"
+        echo -e "${YELLOW}⚠ automation.enabled not found in site config response (${SITE_CONFIG_ENDPOINT_USED:-unknown endpoint}).${NC}"
         return
     fi
 
@@ -189,10 +237,29 @@ check_site_automation_setting() {
 
     if [[ "$automation_value" =~ ^(false|0|False|FALSE)$ ]]; then
         AUTOMATION_CHECK_NOTE="automation.enabled=false"
-        echo -e "${GREEN}✓ automation.enabled is disabled at the site level (${endpoint_used:-site config})${NC}"
+        echo -e "${GREEN}✓ automation.enabled is disabled at the site level (${SITE_CONFIG_ENDPOINT_USED:-site config})${NC}"
     else
-        AUTOMATION_CHECK_NOTE="automation.enabled=${automation_value}"
         echo -e "${RED}✗ automation.enabled is set to '${automation_value}' (expected false)${NC}"
+        if disable_site_automation_setting; then
+            if config_response=$(fetch_site_config_json); then
+                automation_value=$(echo "$config_response" | jq -r '.. | ."automation.enabled"? // empty' 2>/dev/null | head -1)
+                if [ -z "$automation_value" ]; then
+                    automation_value=$(echo "$config_response" | jq -r '.. | objects | select(.key == "automation.enabled") | (.value // .text // empty)' 2>/dev/null | head -1)
+                fi
+                if [[ "$automation_value" =~ ^(false|0|False|FALSE)$ ]]; then
+                    AUTOMATION_ENABLED_VALUE="false"
+                    AUTOMATION_CHECK_NOTE="automation.enabled=false (auto-updated)"
+                    echo -e "${GREEN}✓ automation.enabled successfully set to false${NC}"
+                    return
+                fi
+            fi
+            AUTOMATION_ENABLED_VALUE="${automation_value:-unknown}"
+            AUTOMATION_CHECK_NOTE="automation.enabled still ${automation_value:-unknown} after update attempt"
+            echo -e "${YELLOW}⚠ Attempted to disable automation.enabled but it remains '${automation_value:-unknown}'.${NC}"
+        else
+            AUTOMATION_ENABLED_VALUE="$automation_value"
+            AUTOMATION_CHECK_NOTE="automation.enabled=${automation_value} (update failed)"
+        fi
     fi
 }
 

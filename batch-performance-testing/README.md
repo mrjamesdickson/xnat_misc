@@ -41,6 +41,7 @@ Submits container jobs in batch across multiple experiments.
 - Tests with first experiment before full batch
 - Tracks success/failure for each submission
 - Retries job submissions (e.g., HTTP 503/service errors) with logging before giving up
+- Automatically forces `automation.enabled=false` (via `/xapi/siteConfig`) if the site is misconfigured
 - **Monitors job execution until completion** (checks every 10 seconds)
 - Shows real-time status: Running, Complete, Failed, Pending counts
 - Performance metrics (throughput, avg/min/max times, total runtime)
