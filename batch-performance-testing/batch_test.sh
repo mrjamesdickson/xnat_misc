@@ -731,9 +731,8 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         # Fetch workflows with pagination (may need multiple pages)
         ALL_WORKFLOWS="[]"
         PAGE=1
-        MAX_PAGES=10
 
-        while [ $PAGE -le $MAX_PAGES ]; do
+        while true; do
             PAGE_WORKFLOWS=$(curl_api -X POST \
                 -b "JSESSIONID=$JSESSION" \
                 -H "Content-Type: application/json" \
@@ -869,9 +868,8 @@ if [ "$SUCCESS_COUNT" -gt 0 ] && [ -z "$FINAL_WORKFLOWS" ]; then
         # Fetch workflows with pagination (same logic as check_status.sh)
         ALL_WORKFLOWS="[]"
         PAGE=1
-        MAX_PAGES=20
 
-        while [ $PAGE -le $MAX_PAGES ]; do
+        while true; do
             echo -ne "\r${YELLOW}Fetching page $PAGE...${NC}  "
 
             WORKFLOW_QUERY="{\"page\":$PAGE,\"id\":\"$LARGEST_PROJECT\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}"
