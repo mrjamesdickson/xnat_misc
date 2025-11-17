@@ -264,7 +264,7 @@ usage() {
     echo "  -p  Password"
     echo "  -j  Project ID to test (optional - shows interactive selection if not provided)"
     echo "  -C  Use cached project counts (faster, skips API calls for project enumeration)"
-    echo "  -c  Container name to run (optional - will list if not provided)"
+    echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
     exit 1
@@ -502,11 +502,12 @@ if [ -z "$COMMANDS" ]; then
     COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
 fi
 
-# Search for wrapper by name or ID in all commands
+# Search for wrapper by name, ID, or image in all commands
 WRAPPER_ID=$(echo "$COMMANDS" | jq -r --arg name "$CONTAINER_NAME" '
     .[] |
+    (.image // "") as $img |
     (.xnat // .["xnat-command-wrappers"] // .xnatCommandWrappers // [])[] |
-    select(.name == $name or (.id|tostring) == $name) |
+    select(.name == $name or (.id|tostring) == $name or $img == $name) |
     .id
 ' | head -1)
 
@@ -650,22 +651,24 @@ if [ -z "$COMMANDS" ]; then
     COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
 fi
 
-# Search for wrapper by name or ID in all commands
+# Search for wrapper by name, ID, or image in all commands
 WRAPPER_ID=$(echo "$COMMANDS" | jq -r --arg name "$CONTAINER_NAME" '
     .[] |
+    (.image // "") as $img |
     (.xnat // .["xnat-command-wrappers"] // .xnatCommandWrappers // [])[] |
-    select(.name == $name or (.id|tostring) == $name) |
+    select(.name == $name or (.id|tostring) == $name or $img == $name) |
     .id
 ' | head -1)
 
 if [ -z "$WRAPPER_ID" ]; then
     echo -e "${RED}Wrapper '$CONTAINER_NAME' not found${NC}"
     echo ""
-    echo "Available wrappers:"
+    echo "Available wrappers (ID: Name - Image):"
     echo "$COMMANDS" | jq -r '
         .[] |
+        (.image // "unknown") as $img |
         (.xnat // .["xnat-command-wrappers"] // .xnatCommandWrappers // [])[] |
-        "\(.id): \(.name)"
+        "\(.id): \(.name) - \($img)"
     '
     exit 1
 fi
