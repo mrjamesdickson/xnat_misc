@@ -447,13 +447,14 @@ if [ -z "$CONTAINER_NAME" ]; then
         # Extract wrappers from commands and check if enabled for selected project
         echo ""
         echo "Containers available for project ${LARGEST_PROJECT}:"
-        echo -e "ID\tName\tStatus\tContexts" > /tmp/wrappers_$$.txt
+        echo -e "ID\tName\tImage\tStatus\tContexts" > /tmp/wrappers_$$.txt
 
         echo "$COMMANDS" | jq -r '
             .[] |
+            .image as $img |
             (.xnat // .["xnat-command-wrappers"] // .xnatCommandWrappers // [])[] |
-            "\(.id)\t\(.name)\t\(.contexts | join(","))"
-        ' | while IFS=$'\t' read -r wrapper_id wrapper_name contexts; do
+            "\(.id)\t\(.name)\t\($img // "unknown")\t\(.contexts | join(","))"
+        ' | while IFS=$'\t' read -r wrapper_id wrapper_name image contexts; do
             # Check if this wrapper is enabled for the selected project
             enabled_resp=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${wrapper_id}/enabled" 2>/dev/null)
 
@@ -465,9 +466,9 @@ if [ -z "$CONTAINER_NAME" ]; then
             fi
 
             if [ "$enabled" = "true" ]; then
-                echo -e "$wrapper_id\t$wrapper_name\tenabled\t$contexts" >> /tmp/wrappers_$$.txt
+                echo -e "$wrapper_id\t$wrapper_name\t$image\tenabled\t$contexts" >> /tmp/wrappers_$$.txt
             else
-                echo -e "$wrapper_id\t$wrapper_name\tdisabled\t$contexts" >> /tmp/wrappers_$$.txt
+                echo -e "$wrapper_id\t$wrapper_name\t$image\tdisabled\t$contexts" >> /tmp/wrappers_$$.txt
             fi
         done
 
