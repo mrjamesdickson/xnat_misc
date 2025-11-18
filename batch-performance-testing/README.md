@@ -95,10 +95,16 @@ Submits container jobs based on experiment metadata from a CSV file.
 The CSV file requires these columns (case-sensitive, but order doesn't matter):
 
 **Required columns:**
-- `Label` - Experiment label (e.g., EXP001)
-- `Subject` - Subject ID (e.g., SUBJ001)
+- `Label` - Experiment label (e.g., EXP001) → generates experiment ID: `{Project}_{Label}`
+- `Subject` - Subject label (e.g., SUBJ001) → generates subject ID: `{Project}_{Subject}`
 - `Date` - Session date (YYYY-MM-DD format)
 - `Project` - XNAT project ID
+
+**ID Generation:**
+The script automatically creates XNAT IDs from labels:
+- Subject ID: `{Project}_{Subject}` (e.g., `ProjectA_SUBJ001`)
+- Experiment ID: `{Project}_{Label}` (e.g., `ProjectA_EXP001`)
+- Subjects are created automatically if they don't exist
 
 **Optional columns:**
 - `Gender` - Patient gender (M/F)
@@ -160,7 +166,9 @@ ProjectA,2024-01-16,EXP002,SUBJ002,MoreData,F,38,Another note
 2. Identify all unique projects from CSV
 3. Select wrapper
 4. **Enable wrapper for ALL projects** found in CSV (automatic)
-5. Create experiments in XNAT (unless `-s` flag set)
+5. Create subjects and experiments in XNAT (unless `-s` flag set):
+   - For each row: creates subject `{Project}_{Subject}` if it doesn't exist
+   - Then creates experiment `{Project}_{Label}` linked to that subject
 6. Submit container jobs (using correct project for each experiment)
 7. Report final status with performance metrics
 8. Generate and upload HTML report (if `-r` specified)

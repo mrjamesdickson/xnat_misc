@@ -609,15 +609,38 @@ if [ "$SKIP_CREATE" = false ]; then
         # Read CSV and create experiments
         tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
             # Extract values using dynamic column indices
-            label=$(get_csv_value "$row" "$COL_LABEL")
-            subject=$(get_csv_value "$row" "$COL_SUBJECT")
+            exp_label=$(get_csv_value "$row" "$COL_LABEL")
+            subj_label=$(get_csv_value "$row" "$COL_SUBJECT")
             date=$(get_csv_value "$row" "$COL_DATE")
             project=$(get_csv_value "$row" "$COL_PROJECT")
 
-            # Build experiment ID from project and label
-            EXP_ID="${project}_${label}"
+            # Build IDs from project and labels
+            EXP_ID="${project}_${exp_label}"
+            SUBJ_ID="${project}_${subj_label}"
 
-            # Check if experiment already exists
+            # Step 1: Create/verify subject exists
+            SUBJ_CHECK=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${project}/subjects/${SUBJ_ID}?format=json" 2>/dev/null)
+
+            if ! echo "$SUBJ_CHECK" | jq -e '.items[0]' >/dev/null 2>&1; then
+                # Subject doesn't exist, create it
+                SUBJ_CREATE=$(curl_api -w "\nHTTP_CODE:%{http_code}" -X PUT \
+                    -b "JSESSIONID=$JSESSION" \
+                    -H "Content-Type: application/xml" \
+                    "${XNAT_HOST}/data/projects/${project}/subjects/${SUBJ_ID}" \
+                    -d "<Subject xmlns=\"http://nrg.wustl.edu/xnat\" ID=\"${SUBJ_ID}\" project=\"${project}\" label=\"${subj_label}\"/>")
+
+                SUBJ_HTTP_CODE=$(echo "$SUBJ_CREATE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
+
+                if [[ "$SUBJ_HTTP_CODE" =~ ^(200|201)$ ]]; then
+                    echo -e "${BLUE}  Created subject: $SUBJ_ID (label: $subj_label)${NC}"
+                else
+                    echo -e "${RED}✗${NC} Failed to create subject $SUBJ_ID (HTTP $SUBJ_HTTP_CODE)"
+                    ERROR_COUNT=$((ERROR_COUNT + 1))
+                    continue
+                fi
+            fi
+
+            # Step 2: Check if experiment already exists
             CHECK_RESULT=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments/${EXP_ID}?format=json" 2>/dev/null)
 
             if echo "$CHECK_RESULT" | jq -e '.items[0]' >/dev/null 2>&1; then
@@ -626,9 +649,9 @@ if [ "$SKIP_CREATE" = false ]; then
                 continue
             fi
 
-            # Create experiment (MR Session)
-            CREATE_XML="<MRSession xmlns=\"http://nrg.wustl.edu/xnat\" xmlns:xnat=\"http://nrg.wustl.edu/xnat\" ID=\"${EXP_ID}\" project=\"${project}\" label=\"${label}\">
-  <xnat:subject_ID>${subject}</xnat:subject_ID>
+            # Step 3: Create experiment (MR Session) with proper subject_ID
+            CREATE_XML="<MRSession xmlns=\"http://nrg.wustl.edu/xnat\" xmlns:xnat=\"http://nrg.wustl.edu/xnat\" ID=\"${EXP_ID}\" project=\"${project}\" label=\"${exp_label}\">
+  <xnat:subject_ID>${SUBJ_ID}</xnat:subject_ID>
   <xnat:date>${date}</xnat:date>
 </MRSession>"
 
@@ -641,10 +664,10 @@ if [ "$SKIP_CREATE" = false ]; then
             HTTP_CODE=$(echo "$CREATE_RESULT" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
 
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-                echo -e "${GREEN}✓${NC} Created $EXP_ID in project $project"
+                echo -e "${GREEN}✓${NC} Created experiment $EXP_ID (label: $exp_label) for subject $SUBJ_ID"
                 CREATE_COUNT=$((CREATE_COUNT + 1))
             else
-                echo -e "${RED}✗${NC} Failed to create $EXP_ID (HTTP $HTTP_CODE)"
+                echo -e "${RED}✗${NC} Failed to create experiment $EXP_ID (HTTP $HTTP_CODE)"
                 ERROR_COUNT=$((ERROR_COUNT + 1))
             fi
         done
@@ -733,13 +756,13 @@ tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; d
     JOB_NUMBER=$((JOB_NUMBER + 1))
 
     # Extract values using dynamic column indices
-    label=$(get_csv_value "$row" "$COL_LABEL")
+    exp_label=$(get_csv_value "$row" "$COL_LABEL")
     project=$(get_csv_value "$row" "$COL_PROJECT")
 
-    # Build experiment ID
-    EXP_ID="${project}_${label}"
+    # Build experiment ID from project and label (same as creation)
+    EXP_ID="${project}_${exp_label}"
 
-    echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID (Project: $project)"
+    echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID (label: $exp_label, project: $project)"
     JOB_START_TIME=$(date +%s.%N)
 
     submit_job_with_retry "$EXP_ID" "$project" "$LOG_FILE"
