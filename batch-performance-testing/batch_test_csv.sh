@@ -762,90 +762,82 @@ echo ""
 
 # Bulk submission mode
 if [ "$BULK_MODE" = true ]; then
-    echo -e "${YELLOW}Using bulk submission mode (one API call per project)${NC}"
+    echo -e "${YELLOW}Using bulk submission mode (single API call for all experiments)${NC}"
     echo ""
 
-    for project in $PROJECTS; do
-        # Collect all experiment IDs for this project
-        PROJECT_EXPERIMENTS=()
-        while IFS= read -r row; do
-            proj=$(get_csv_value "$row" "$COL_PROJECT")
-            exp_id=$(get_csv_value "$row" "$COL_ID")
+    # Collect ALL experiment IDs
+    ALL_EXPERIMENTS=()
+    while IFS= read -r row; do
+        proj=$(get_csv_value "$row" "$COL_PROJECT")
+        exp_id=$(get_csv_value "$row" "$COL_ID")
 
-            if [ "$proj" = "$project" ]; then
-                # Format experiment ID if needed
-                if [[ "$exp_id" != *_* ]]; then
-                    EXP_ID="${project}_E${exp_id}"
-                else
-                    EXP_ID="$exp_id"
-                fi
-                PROJECT_EXPERIMENTS+=("$EXP_ID")
-            fi
-        done < <(tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT")
-
-        PROJ_COUNT=${#PROJECT_EXPERIMENTS[@]}
-        if [ "$PROJ_COUNT" -eq 0 ]; then
-            continue
-        fi
-
-        echo -e "${BLUE}Submitting $PROJ_COUNT experiments for project $project in bulk...${NC}"
-
-        # Build JSON array of experiment paths
-        SESSION_ARRAY=$(printf '/archive/experiments/%s\n' "${PROJECT_EXPERIMENTS[@]}" | jq -R . | jq -s .)
-        BULK_PAYLOAD=$(jq -n --argjson sessions "$SESSION_ARRAY" '{"session": ($sessions | tostring)}')
-
-        if [ "$DEBUG" = true ]; then
-            echo ""
-            echo -e "${YELLOW}=== DEBUG: BULK API REQUEST ===${NC}"
-            echo "URL: ${XNAT_HOST}/xapi/projects/${project}/wrappers/${WRAPPER_ID}/root/session/bulklaunch"
-            echo "Method: POST"
-            echo "Payload:"
-            echo "$BULK_PAYLOAD" | jq '.'
-            echo ""
-        fi
-
-        BULK_START_TIME=$(date +%s.%N)
-
-        BULK_RESPONSE=$(curl_job_submit \
-            -w "\n%{http_code}" \
-            -X POST \
-            -b "JSESSIONID=$JSESSION" \
-            -H "Content-Type: application/json" \
-            -H "X-Requested-With: XMLHttpRequest" \
-            "${XNAT_HOST}/xapi/projects/${project}/wrappers/${WRAPPER_ID}/root/session/bulklaunch" \
-            -d "$BULK_PAYLOAD")
-
-        BULK_END_TIME=$(date +%s.%N)
-        BULK_DURATION=$(echo "$BULK_END_TIME - $BULK_START_TIME" | bc)
-
-        # Parse response - last line is HTTP code, rest is body
-        BULK_HTTP_CODE=$(echo "$BULK_RESPONSE" | tail -1)
-        # Use sed to remove last line (works on both BSD and GNU)
-        BULK_BODY=$(echo "$BULK_RESPONSE" | sed '$d')
-
-        echo "Bulk submission completed in ${BULK_DURATION}s"
-        echo "HTTP Status: $BULK_HTTP_CODE"
-
-        if [ "$BULK_HTTP_CODE" = "200" ] || [ "$BULK_HTTP_CODE" = "201" ]; then
-            echo -e "${GREEN}✓ Successfully submitted $PROJ_COUNT experiments for project $project${NC}"
-            SUCCESS_COUNT=$((SUCCESS_COUNT + PROJ_COUNT))
+        # Format experiment ID if needed
+        if [[ "$exp_id" != *_* ]]; then
+            EXP_ID="${proj}_E${exp_id}"
         else
-            echo -e "${RED}✗ Bulk submission failed for project $project${NC}"
-            echo "Response: $BULK_BODY"
-            FAIL_COUNT=$((FAIL_COUNT + PROJ_COUNT))
+            EXP_ID="$exp_id"
         fi
-        echo ""
+        ALL_EXPERIMENTS+=("$EXP_ID")
+    done < <(tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT")
 
-        # Log bulk submission
-        cat >> "$LOG_FILE" <<EOF
-[$(date '+%Y-%m-%d %H:%M:%S')] BULK SUBMISSION - $project
-  Experiments: $PROJ_COUNT
+    TOTAL_COUNT=${#ALL_EXPERIMENTS[@]}
+    echo -e "${BLUE}Submitting $TOTAL_COUNT experiments in bulk...${NC}"
+
+    # Build JSON array of experiment paths
+    SESSION_ARRAY=$(printf '/archive/experiments/%s\n' "${ALL_EXPERIMENTS[@]}" | jq -R . | jq -s .)
+    BULK_PAYLOAD=$(jq -n --argjson sessions "$SESSION_ARRAY" '{"session": ($sessions | tostring)}')
+
+    if [ "$DEBUG" = true ]; then
+        echo ""
+        echo -e "${YELLOW}=== DEBUG: BULK API REQUEST ===${NC}"
+        echo "URL: ${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/session/bulklaunch"
+        echo "Method: POST"
+        echo "Payload:"
+        echo "$BULK_PAYLOAD" | jq '.'
+        echo ""
+    fi
+
+    BULK_START_TIME=$(date +%s.%N)
+
+    BULK_RESPONSE=$(curl_job_submit \
+        -w "\n%{http_code}" \
+        -X POST \
+        -b "JSESSIONID=$JSESSION" \
+        -H "Content-Type: application/json" \
+        -H "X-Requested-With: XMLHttpRequest" \
+        "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/session/bulklaunch" \
+        -d "$BULK_PAYLOAD")
+
+    BULK_END_TIME=$(date +%s.%N)
+    BULK_DURATION=$(echo "$BULK_END_TIME - $BULK_START_TIME" | bc)
+
+    # Parse response - last line is HTTP code, rest is body
+    BULK_HTTP_CODE=$(echo "$BULK_RESPONSE" | tail -1)
+    # Use sed to remove last line (works on both BSD and GNU)
+    BULK_BODY=$(echo "$BULK_RESPONSE" | sed '$d')
+
+    echo "Bulk submission completed in ${BULK_DURATION}s"
+    echo "HTTP Status: $BULK_HTTP_CODE"
+
+    if [ "$BULK_HTTP_CODE" = "200" ] || [ "$BULK_HTTP_CODE" = "201" ]; then
+        echo -e "${GREEN}✓ Successfully submitted $TOTAL_COUNT experiments${NC}"
+        SUCCESS_COUNT=$TOTAL_COUNT
+    else
+        echo -e "${RED}✗ Bulk submission failed${NC}"
+        echo "Response: $BULK_BODY"
+        FAIL_COUNT=$TOTAL_COUNT
+    fi
+    echo ""
+
+    # Log bulk submission
+    cat >> "$LOG_FILE" <<EOF
+[$(date '+%Y-%m-%d %H:%M:%S')] BULK SUBMISSION
+  Experiments: $TOTAL_COUNT
   Duration: ${BULK_DURATION}s
   HTTP Status: $BULK_HTTP_CODE
-  Experiments: ${PROJECT_EXPERIMENTS[*]}
+  Experiments: ${ALL_EXPERIMENTS[*]}
 
 EOF
-    done
 else
     # Individual submission mode - submit jobs one by one
     JOB_NUMBER=0

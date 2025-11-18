@@ -4,7 +4,7 @@
 
 ### Request
 ```
-POST http://localhost/xapi/projects/test/wrappers/15/root/session/bulklaunch
+POST http://localhost/xapi/wrappers/15/root/session/bulklaunch
 Content-Type: application/json
 X-Requested-With: XMLHttpRequest
 Cookie: JSESSIONID=...
@@ -35,9 +35,11 @@ Result: ✓ Successfully submitted 3 experiments
    - Full path required
    - Must start with `/archive/experiments/`
 
-3. **One call per project**
-   - All experiments in CSV for project "test" submitted in single call
-   - If CSV had multiple projects, separate bulk call per project
+3. **Single call for ALL experiments**
+   - Can submit experiments from multiple projects in one call
+   - No project required in URL path
+   - Maximum performance: 1 API call total
+   - Only requires `session` field in payload
 
 ## More Examples
 
@@ -58,14 +60,14 @@ Result: ✓ Successfully submitted 3 experiments
 ## How It's Built (Code Snippet)
 
 ```bash
-# 1. Collect experiment IDs into array
-PROJECT_EXPERIMENTS=("XNAT_E02227" "XNAT_E02214" "XNAT_E02237")
+# 1. Collect ALL experiment IDs into array (can be from multiple projects!)
+ALL_EXPERIMENTS=("XNAT_E02227" "XNAT_E02214" "XNAT_E02237")
 
 # 2. Build JSON array of paths
-SESSION_ARRAY=$(printf '/archive/experiments/%s\n' "${PROJECT_EXPERIMENTS[@]}" | jq -R . | jq -s .)
+SESSION_ARRAY=$(printf '/archive/experiments/%s\n' "${ALL_EXPERIMENTS[@]}" | jq -R . | jq -s .)
 # Result: ["/archive/experiments/XNAT_E02227","/archive/experiments/XNAT_E02214","/archive/experiments/XNAT_E02237"]
 
-# 3. Convert to string and wrap in {"session": ...}
+# 3. Build payload (session field as stringified JSON array)
 BULK_PAYLOAD=$(jq -n --argjson sessions "$SESSION_ARRAY" '{"session": ($sessions | tostring)}')
 # Result: {"session": "[...]"}
 ```
@@ -101,12 +103,12 @@ Data: context=session&session=XNAT_E02227
 
 ### Bulk Mode (-b flag)
 ```bash
-# Once per project:
-POST /xapi/projects/test/wrappers/15/root/session/bulklaunch
+# Single call for ALL experiments (regardless of project):
+POST /xapi/wrappers/15/root/session/bulklaunch
 Content-Type: application/json
 Data: {"session": "[...all experiments...]"}
 
-# Result: 1 API call per project
+# Result: 1 API call total (can include experiments from multiple projects!)
 ```
 
 ## Performance Impact
@@ -114,8 +116,8 @@ Data: {"session": "[...all experiments...]"}
 **1000 experiments across 5 projects:**
 
 - **Individual:** 1000 API calls @ 0.1s each = 100 seconds
-- **Bulk:** 5 API calls @ 0.5s each = 2.5 seconds
-- **Speedup:** ~40x faster
+- **Bulk:** 1 API call @ 0.5s each = 0.5 seconds
+- **Speedup:** ~200x faster
 
 **Real test results:**
 - 3 experiments
