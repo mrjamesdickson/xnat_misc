@@ -1080,11 +1080,15 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             continue
         fi
 
-        # Count by status
-        RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started"; "i"))] | length' 2>/dev/null)
-        COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete|Success|Done"; "i"))] | length' 2>/dev/null)
-        FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Fail|Error"; "i"))] | length' 2>/dev/null)
-        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Pending|Queued"; "i"))] | length' 2>/dev/null)
+        # Count by status (using official XNAT container-service statuses)
+        # Running states: Running, Started, In Progress
+        RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress"; "i"))] | length' 2>/dev/null)
+        # Complete states: Complete, Completed (container-service uses both)
+        COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete"; "i"))] | length' 2>/dev/null)
+        # Failed states: Failed, Killed (terminal states from ContainerUtils)
+        FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Failed|Killed"; "i"))] | length' 2>/dev/null)
+        # Pending states: Queued, Finalizing (Finalizing is pre-Complete state)
+        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing"; "i"))] | length' 2>/dev/null)
 
         # Clean up display line
         echo -ne "\r                                                                                           \r"
