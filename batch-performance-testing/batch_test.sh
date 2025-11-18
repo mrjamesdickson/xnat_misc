@@ -258,7 +258,7 @@ check_site_automation_setting() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-b]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -267,12 +267,14 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
+    echo "  -b  Use bulk submission (submit all sessions in a single API call)"
     exit 1
 }
 
 # Parse arguments
 USE_CACHE=false
-while getopts "h:u:p:j:c:m:r:C" opt; do
+BULK_MODE=false
+while getopts "h:u:p:j:c:m:r:Cb" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -282,6 +284,7 @@ while getopts "h:u:p:j:c:m:r:C" opt; do
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
         C) USE_CACHE=true ;;
+        b) BULK_MODE=true ;;
         *) usage ;;
     esac
 done
@@ -611,6 +614,11 @@ echo -e "${YELLOW}=== READY TO SUBMIT BATCH ===${NC}"
 echo "Project: $LARGEST_PROJECT"
 echo "Experiments: $EXPERIMENT_COUNT"
 echo "Container: $CONTAINER_NAME"
+if [ "$BULK_MODE" = true ]; then
+    echo "Mode: BULK (single API call)"
+else
+    echo "Mode: Individual (one call per experiment)"
+fi
 echo ""
 echo -e "${RED}This will create $EXPERIMENT_COUNT container jobs!${NC}"
 echo ""
@@ -738,6 +746,7 @@ Project: $LARGEST_PROJECT ($MAX_EXPERIMENTS total experiments)
 Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
 Experiments to Process: $EXPERIMENT_COUNT
 Max Jobs Limit: ${MAX_JOBS:-None (processing all)}
+Submission Mode: $([ "$BULK_MODE" = true ] && echo "Bulk" || echo "Individual")
 Site Automation Enabled: ${AUTOMATION_ENABLED_VALUE}
 Automation Check Note: ${AUTOMATION_CHECK_NOTE}
 =================================================================
@@ -748,8 +757,73 @@ echo ""
 echo "Logging to: $LOG_FILE"
 echo ""
 
-JOB_NUMBER=0
-echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
+# Bulk submission mode
+if [ "$BULK_MODE" = true ]; then
+    echo -e "${YELLOW}Using bulk submission mode${NC}"
+    echo ""
+
+    # Build JSON array of experiment paths (session field is a JSON-encoded string)
+    SESSION_ARRAY=$(echo "$EXPERIMENT_IDS" | while read -r exp; do
+        echo "\"/archive/experiments/$exp\""
+    done | paste -sd ',' -)
+
+    # Use jq to properly build the JSON payload with escaped session string
+    BULK_PAYLOAD=$(jq -n --arg session "[$SESSION_ARRAY]" '{"session": $session}')
+
+    echo "Submitting $EXPERIMENT_COUNT experiments in bulk..."
+    echo ""
+
+    BULK_START_TIME=$(date +%s.%N)
+
+    BULK_RESPONSE=$(curl_job_submit \
+        -w "\n%{http_code}" \
+        -X POST \
+        -b "JSESSIONID=$JSESSION" \
+        -H "Content-Type: application/json" \
+        -H "X-Requested-With: XMLHttpRequest" \
+        "${XNAT_HOST}/xapi/projects/${LARGEST_PROJECT}/wrappers/${WRAPPER_ID}/root/session/bulklaunch" \
+        -d "$BULK_PAYLOAD")
+
+    BULK_END_TIME=$(date +%s.%N)
+    BULK_DURATION=$(echo "$BULK_END_TIME - $BULK_START_TIME" | bc)
+
+    # Parse response - last line is HTTP code, rest is body
+    BULK_HTTP_CODE=$(echo "$BULK_RESPONSE" | tail -1)
+    BULK_BODY=$(echo "$BULK_RESPONSE" | head -n -1)
+
+    echo "Bulk submission completed in ${BULK_DURATION}s"
+    echo "HTTP Status: $BULK_HTTP_CODE"
+    echo ""
+    echo "Response:"
+    echo "$BULK_BODY" | jq '.' 2>/dev/null || echo "$BULK_BODY"
+    echo ""
+
+    # Log bulk submission
+    cat >> "$LOG_FILE" <<EOF
+[$(date '+%Y-%m-%d %H:%M:%S')] BULK SUBMISSION
+  Experiments: $EXPERIMENT_COUNT
+  Duration: ${BULK_DURATION}s
+  HTTP Status: $BULK_HTTP_CODE
+  Response: $BULK_BODY
+
+EOF
+
+    if [ "$BULK_HTTP_CODE" = "200" ] || [ "$BULK_HTTP_CODE" = "201" ]; then
+        echo -e "${GREEN}✓ Bulk submission successful${NC}"
+        SUCCESS_COUNT=$EXPERIMENT_COUNT
+        FAIL_COUNT=0
+    else
+        echo -e "${RED}✗ Bulk submission failed${NC}"
+        SUCCESS_COUNT=0
+        FAIL_COUNT=$EXPERIMENT_COUNT
+    fi
+
+    # Skip individual submission loop
+    BATCH_END_TIME=$(date +%s)
+else
+    # Individual submission mode (existing logic)
+    JOB_NUMBER=0
+    echo "$EXPERIMENT_IDS" | while read -r EXP_ID; do
     JOB_NUMBER=$((JOB_NUMBER + 1))
     echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID"
     JOB_START_TIME=$(date +%s.%N)
@@ -795,28 +869,35 @@ EOF
 
 EOF
     fi
-done
+    done
 
-BATCH_END_TIME=$(date +%s)
+    BATCH_END_TIME=$(date +%s)
+
+    # Count results from file (since while loop runs in subshell)
+    if [ -f "$RESULTS_FILE" ]; then
+        SUCCESS_COUNT=$(grep -c "SUCCESS" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        FAIL_COUNT=$(grep -c "FAIL" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        rm "$RESULTS_FILE"
+    else
+        SUCCESS_COUNT=0
+        FAIL_COUNT=0
+    fi
+fi
+
 BATCH_END_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TOTAL_DURATION=$((BATCH_END_TIME - BATCH_START_TIME))
-
-# Count results from file (since while loop runs in subshell)
-if [ -f "$RESULTS_FILE" ]; then
-    SUCCESS_COUNT=$(grep -c "SUCCESS" "$RESULTS_FILE" 2>/dev/null || echo "0")
-    FAIL_COUNT=$(grep -c "FAIL" "$RESULTS_FILE" 2>/dev/null || echo "0")
-    rm "$RESULTS_FILE"
-else
-    SUCCESS_COUNT=0
-    FAIL_COUNT=0
-fi
 
 # Ensure counts are numeric (handle empty strings)
 SUCCESS_COUNT=${SUCCESS_COUNT:-0}
 FAIL_COUNT=${FAIL_COUNT:-0}
 
 # Calculate timing statistics
-if [ -f "$TIMING_FILE" ]; then
+if [ "$BULK_MODE" = true ] && [ -n "$BULK_DURATION" ]; then
+    # For bulk mode, all timing is the single bulk call
+    AVG_DURATION=$BULK_DURATION
+    MIN_DURATION=$BULK_DURATION
+    MAX_DURATION=$BULK_DURATION
+elif [ -f "$TIMING_FILE" ]; then
     AVG_DURATION=$(awk '{ total += $1; count++ } END { if (count > 0) print total/count; else print 0 }' "$TIMING_FILE")
     MIN_DURATION=$(sort -n "$TIMING_FILE" | head -1)
     MAX_DURATION=$(sort -n "$TIMING_FILE" | tail -1)
