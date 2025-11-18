@@ -469,6 +469,8 @@ fi
 echo -e "${GREEN}✓ CSV header validated${NC}"
 echo "  Required columns found: ID (col $COL_ID), Project (col $COL_PROJECT)"
 echo ""
+echo -e "${BLUE}CSV header: $CSV_HEADER${NC}"
+echo ""
 
 # Determine how many experiments to process
 if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ]; then
@@ -523,14 +525,17 @@ if [[ ! "$PROJECT_CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
 fi
 echo ""
 
-# Show selected experiments
+# Show selected experiments with parsed values
 if [ "$EXPERIMENT_COUNT" -le 5 ]; then
     echo "Experiments to process:"
-    tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | nl -w 3 -s '. '
 else
     echo "First 5 of $EXPERIMENT_COUNT experiments:"
-    tail -n +2 "$CSV_FILE" | head -5 | nl -w 3 -s '. '
 fi
+tail -n +2 "$CSV_FILE" | head -n 5 | while IFS= read -r row; do
+    id_val=$(get_csv_value "$row" "$COL_ID")
+    proj_val=$(get_csv_value "$row" "$COL_PROJECT")
+    echo "  ID='$id_val', Project='$proj_val'"
+done
 echo ""
 
 # Step 3: Select container
