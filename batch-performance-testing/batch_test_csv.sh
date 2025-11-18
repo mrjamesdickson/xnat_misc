@@ -508,6 +508,28 @@ else
 fi
 echo ""
 
+# Confirm projects before proceeding
+echo -e "${YELLOW}=== PROJECT CONFIRMATION ===${NC}"
+echo "The script will work with the following project(s):"
+echo ""
+
+# Show experiment count per project
+echo "$PROJECTS" | while read -r proj; do
+    COUNT=$(tail -n +2 "$CSV_FILE" | awk -F',' -v col="$COL_PROJECT" -v project="$proj" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); if ($col == project) count++} END {print count+0}')
+    printf "  %-15s (%d experiments)\n" "$proj" "$COUNT"
+done
+echo ""
+echo "Total: $CSV_EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s)"
+echo ""
+
+read -p "Continue with these projects? (y/yes): " PROJECT_CONFIRM
+
+if [[ ! "$PROJECT_CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    echo "Aborted. Please check your CSV file and try again."
+    exit 0
+fi
+echo ""
+
 # Show first few experiments
 echo "First 5 experiments from CSV:"
 tail -n +2 "$CSV_FILE" | head -5 | nl -w 3 -s '. '
