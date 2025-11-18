@@ -258,7 +258,7 @@ check_site_automation_setting() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-i]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-i] [-v]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -268,13 +268,15 @@ usage() {
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
     echo "  -i  Use individual mode (one API call per experiment) - default is bulk mode (single API call, 200x faster)"
+    echo "  -v  Verbose mode - show individual workflow details during monitoring"
     exit 1
 }
 
 # Parse arguments
 USE_CACHE=false
+VERBOSE=false
 BULK_MODE=true  # Default to bulk mode (200x faster)
-while getopts "h:u:p:j:c:m:r:Ci" opt; do
+while getopts "h:u:p:j:c:m:r:Civ" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -285,6 +287,7 @@ while getopts "h:u:p:j:c:m:r:Ci" opt; do
         r) REPORT_PROJECT="$OPTARG" ;;
         C) USE_CACHE=true ;;
         i) BULK_MODE=false ;;  # Individual mode (one API call per experiment)
+        v) VERBOSE=true ;;
         *) usage ;;
     esac
 done
@@ -1053,6 +1056,11 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         if [ "$ALL_WORKFLOWS" = "[]" ]; then
             echo -ne "\r${YELLOW}No workflows found yet, waiting...${NC}                              "
+            if [ "$VERBOSE" = true ]; then
+                echo ""
+                echo "  (No workflows returned from API)"
+                echo ""
+            fi
             continue
         fi
 
@@ -1068,24 +1076,35 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         if [ -z "$TOTAL_WORKFLOWS" ] || [ "$TOTAL_WORKFLOWS" = "0" ]; then
             echo -ne "\r${YELLOW}No workflows found yet, waiting...${NC}                              "
+            if [ "$VERBOSE" = true ]; then
+                echo ""
+                echo "  Workflows returned from API but none match our filter:"
+                echo "  Looking for: container='$CONTAINER_NAME', start_time >= $BATCH_START_TIME"
+                echo ""
+                echo "  All workflows received:"
+                echo "$ALL_WORKFLOWS" | jq -r '.[] | "    - Pipeline: \(.pipelineName // .pipeline_name // "N/A"), LaunchTime: \((.launchTime // .launch_time // 0) / 1000), Status: \(.status)"' 2>/dev/null || echo "    (Unable to parse)"
+                echo ""
+            fi
             continue
         fi
 
-        # Count by status
-        # Count by status (using official XNAT container-service statuses)
-        # Running states: Running, Started, In Progress
+        # Count by status (matches any status containing these keywords)
         RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress"; "i"))] | length' 2>/dev/null)
-        # Complete states: Complete, Completed (container-service uses both)
         COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete"; "i"))] | length' 2>/dev/null)
-        # Failed states: Failed, Killed (terminal states from ContainerUtils)
         FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Failed|Killed"; "i"))] | length' 2>/dev/null)
-        # Pending states: Queued, Finalizing (Finalizing is pre-Complete state)
         PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing"; "i"))] | length' 2>/dev/null)
 
         # Clean up display line
         echo -ne "\r                                                                                           \r"
 
         echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+
+        # Show individual workflow details in verbose mode
+        if [ "$VERBOSE" = true ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
+            echo ""
+            echo "$BATCH_WORKFLOWS" | jq -r '.[] | "  - Workflow \(.workflowId // .workflow_id // "N/A"): \(.externalId // .external_id // "N/A") - \(.status) (launched \(.launchTime // .launch_time // 0 | tonumber / 1000 | strftime("%Y-%m-%d %H:%M:%S")))"' 2>/dev/null || echo "  (Unable to parse workflow details)"
+            echo ""
+        fi
 
         # Check if all jobs are done (none running or pending)
         if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -ge "$SUCCESS_COUNT" ]; then
