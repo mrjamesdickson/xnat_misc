@@ -934,13 +934,15 @@ echo ""
 echo -e "${YELLOW}Full log saved to: $LOG_FILE${NC}"
 echo ""
 
-# Wait for jobs to complete
+# Wait for jobs to complete (MANDATORY - script will NOT exit until jobs finish)
+# This ensures the final report contains ACTUAL completion status, not just submission status
 if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
     echo -e "${YELLOW}=== MONITORING JOB EXECUTION ===${NC}"
+    echo -e "${YELLOW}NOTE: Script will wait for all jobs to complete before exiting${NC}"
     echo ""
-    echo "Waiting for jobs to complete (checking every 10 seconds)..."
-    echo "Press Ctrl+C to stop monitoring and continue"
+    echo "Monitoring workflow status (checking every 10 seconds)..."
+    echo "Press Ctrl+C to stop monitoring and exit early"
     echo ""
 
     WORKFLOW_START_TIME=$(date +%s)
