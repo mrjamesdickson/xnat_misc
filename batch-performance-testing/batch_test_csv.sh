@@ -65,7 +65,7 @@ submit_job_with_retry() {
 
     local attempt=1
 
-    local api_url="${XNAT_HOST}/xapi/projects/${project_id}/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch"
+    local api_url="${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch"
     local api_data="context=session&session=${exp_id}"
 
     if [ "$DEBUG" = true ]; then
