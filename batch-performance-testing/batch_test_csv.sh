@@ -820,7 +820,8 @@ if [ "$BULK_MODE" = true ]; then
 
         # Parse response - last line is HTTP code, rest is body
         BULK_HTTP_CODE=$(echo "$BULK_RESPONSE" | tail -1)
-        BULK_BODY=$(echo "$BULK_RESPONSE" | head -n -1)
+        # Use sed to remove last line (works on both BSD and GNU)
+        BULK_BODY=$(echo "$BULK_RESPONSE" | sed '$d')
 
         echo "Bulk submission completed in ${BULK_DURATION}s"
         echo "HTTP Status: $BULK_HTTP_CODE"
