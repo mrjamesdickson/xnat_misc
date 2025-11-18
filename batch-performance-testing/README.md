@@ -95,50 +95,48 @@ Submits container jobs based on experiment metadata from a CSV file.
 The CSV file requires these columns (case-sensitive, but order doesn't matter):
 
 **Required columns:**
+- `ID` - Experiment identifier (e.g., 00001) → generates experiment ID: `{Project}_E{ID}`
 - `Subject` - Subject number/label (e.g., 00001) → generates subject ID: `{Project}_S{Subject}`
-- `Date` - Session date (YYYY-MM-DD format)
+- `UID` - DICOM StudyInstanceUID (e.g., 1.2.840.113619.2.1.1.1)
 - `Project` - XNAT project ID (e.g., XNAT01)
 
 **Optional columns:**
-- `ID` - Experiment identifier (e.g., 00001) → generates experiment ID: `{Project}_E{ID}` **(preferred)**
-- `Label` - Experiment identifier (alternative to ID, e.g., 00001) → generates experiment ID: `{Project}_E{Label}`
-  - **If neither ID nor Label provided, uses `Subject` for experiment ID**
-  - **Priority: ID > Label > Subject**
+- `Date` - Session date (YYYY-MM-DD format) - uses current date if not provided
+- `Label` - Alternative experiment label
 - `Gender` - Patient gender (M/F)
 - `Age` - Patient age
 - `dcmAccessionNumber` - DICOM accession number
 - `dcmPatientId` - DICOM patient ID
 - `dcmPatientName` - DICOM patient name (use ^ separator)
-- `UID` - Session UID (DICOM StudyInstanceUID)
 - `Scans` - Number of scans or comma-separated scan IDs
 
 **ID Generation:**
 The script automatically creates XNAT IDs in standard format:
 - Subject ID: `{Project}_S{Subject}` (e.g., `XNAT01_S00001`)
-- Experiment ID: `{Project}_E{ID}` or `{Project}_E{Label}` or `{Project}_E{Subject}` (priority: ID > Label > Subject)
+- Experiment ID: `{Project}_E{ID}` (e.g., `XNAT01_E00001`)
 - Subjects are created automatically if they don't exist
 
 **Examples:**
 
-With ID column (one subject, multiple experiments):
+Minimal CSV (required columns only):
 ```
 CSV Row:
-  Project: XNAT01, Subject: 00001, ID: 00001
-  Project: XNAT01, Subject: 00001, ID: 00002
+  ID: 00001, Subject: 00001, UID: 1.2.840.113619.2.1.1.1, Project: XNAT01
+  ID: 00002, Subject: 00001, UID: 1.2.840.113619.2.1.1.2, Project: XNAT01
 
 Generated:
   Subject ID:    XNAT01_S00001
   Experiment IDs: XNAT01_E00001, XNAT01_E00002
 ```
 
-Without ID or Label column (subject = experiment):
+With optional columns:
 ```
 CSV Row:
-  Project: XNAT01, Subject: 00001
+  ID: 00001, Subject: 00001, UID: 1.2.840.113619.2.1.1.1, Project: XNAT01, Date: 2024-01-15
 
 Generated:
   Subject ID:    XNAT01_S00001
-  Experiment ID: XNAT01_E00001 (uses Subject)
+  Experiment ID: XNAT01_E00001 (with date: 2024-01-15)
 ```
 
 **Important:**
@@ -146,25 +144,25 @@ Generated:
 - ✅ **Extra columns** are ignored
 - ✅ Column names are **case-sensitive**
 
-**Example CSV (standard order):**
+**Example CSV (minimal - required only):**
 ```csv
-Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
-00001,00001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,XNAT01
-00002,00002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,XNAT01
+ID,Subject,UID,Project
+00001,00001,1.2.840.113619.2.1.1.1,XNAT01
+00002,00001,1.2.840.113619.2.1.1.2,XNAT01
 ```
-This creates: XNAT01_S00001, XNAT01_E00001, XNAT01_S00002, XNAT01_E00002
+This creates: XNAT01_S00001, XNAT01_E00001, XNAT01_E00002
 
-**Example CSV (reordered columns + extras):**
+**Example CSV (with optional columns):**
 ```csv
-Project,Date,Label,Subject,ExtraColumn,Gender,Age,Notes
-XNAT01,2024-01-15,00001,00001,IgnoredData,M,45,Patient notes
-XNAT02,2024-01-16,00001,00001,MoreData,F,38,Another note
+ID,Subject,UID,Project,Date,Gender,Age
+00001,00001,1.2.840.113619.2.1.1.1,XNAT01,2024-01-15,M,45
+00002,00001,1.2.840.113619.2.1.1.2,XNAT01,2024-01-16,F,38
 ```
-This creates: XNAT01_S00001, XNAT01_E00001, XNAT02_S00001, XNAT02_E00001
+This creates: XNAT01_S00001, XNAT01_E00001, XNAT01_E00002 (with dates)
 
 **Example CSV Files:**
-- `example_minimal.csv` - Minimal format (Subject, Date, Project only)
-- `example_batch.csv` - Single project with ID/Label columns
+- `example_required_only.csv` - **Required columns only** (ID, Subject, UID, Project) - recommended starting point
+- `example_batch.csv` - Single project with all columns
 - `example_multi_project.csv` - Multiple projects example
 - `example_reordered.csv` - Different column order + extra columns (demonstrates flexibility)
 
