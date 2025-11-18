@@ -65,6 +65,27 @@ submit_job_with_retry() {
 
     local attempt=1
 
+    local api_url="${XNAT_HOST}/xapi/projects/${project_id}/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch"
+    local api_data="context=session&session=${exp_id}"
+
+    if [ "$DEBUG" = true ]; then
+        echo ""
+        echo -e "${YELLOW}=== DEBUG: API REQUEST ===${NC}"
+        echo "URL: $api_url"
+        echo "Method: POST"
+        echo "Cookie: JSESSIONID=$JSESSION"
+        echo "Content-Type: application/x-www-form-urlencoded"
+        echo "Data: $api_data"
+        echo ""
+        echo "Full curl command:"
+        echo "curl -X POST \\"
+        echo "  -b 'JSESSIONID=$JSESSION' \\"
+        echo "  -H 'Content-Type: application/x-www-form-urlencoded' \\"
+        echo "  -d '$api_data' \\"
+        echo "  '$api_url'"
+        echo ""
+    fi
+
     while [ $attempt -le "$JOB_SUBMIT_RETRY_ATTEMPTS" ]; do
         local tmp_file
         tmp_file=$(mktemp)
@@ -76,8 +97,8 @@ submit_job_with_retry() {
             -X POST \
             -b "JSESSIONID=$JSESSION" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            "${XNAT_HOST}/xapi/projects/${project_id}/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
-            -d "context=session&session=${exp_id}")
+            "$api_url" \
+            -d "$api_data")
 
         local response
         response=$(cat "$tmp_file")
@@ -86,6 +107,17 @@ submit_job_with_retry() {
         SUBMIT_ATTEMPTS=$attempt
         SUBMIT_HTTP_STATUS="${curl_status:-000}"
         SUBMIT_RESPONSE="$response"
+
+        if [ "$DEBUG" = true ]; then
+            echo -e "${YELLOW}=== DEBUG: API RESPONSE ===${NC}"
+            echo "HTTP Status: $SUBMIT_HTTP_STATUS"
+            echo "Response Body:"
+            echo "$response" | head -20
+            if [ $(echo "$response" | wc -l) -gt 20 ]; then
+                echo "... (truncated, see full response above)"
+            fi
+            echo ""
+        fi
 
         local should_retry=false
         local retry_reason=""
@@ -362,7 +394,7 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-d]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-d] [-D]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -371,6 +403,7 @@ usage() {
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
+    echo "  -D  Debug mode - show detailed API requests and responses"
     echo ""
     echo "Required CSV columns (can be in any order, extra columns ignored):"
     echo "  ID, Project"
@@ -397,7 +430,8 @@ usage() {
 
 # Parse arguments
 DRY_RUN=false
-while getopts "h:u:p:f:c:m:r:d" opt; do
+DEBUG=false
+while getopts "h:u:p:f:c:m:r:dD" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -407,6 +441,7 @@ while getopts "h:u:p:f:c:m:r:d" opt; do
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
         d) DRY_RUN=true ;;
+        D) DEBUG=true ;;
         *) usage ;;
     esac
 done
