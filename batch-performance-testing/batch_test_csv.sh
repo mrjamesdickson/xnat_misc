@@ -100,7 +100,7 @@ submit_job_with_retry() {
 
         if echo "$response" | grep -qi "<!doctype html"; then
             SUBMIT_STATUS="html_error"
-            SUBMIT_ERROR_REASON=$(echo "$response" | grep -oP '(?<=<title>)[^<]+' | head -1)
+            SUBMIT_ERROR_REASON=$(echo "$response" | sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' | head -1)
             [ -z "$SUBMIT_ERROR_REASON" ] && SUBMIT_ERROR_REASON="HTML error page"
             should_retry=true
             [ -z "$retry_reason" ] && retry_reason="$SUBMIT_ERROR_REASON"
@@ -725,6 +725,15 @@ tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; d
     # Extract values using dynamic column indices
     project=$(get_csv_value "$row" "$COL_PROJECT")
     exp_id=$(get_csv_value "$row" "$COL_ID")
+
+    # Debug: check if values are empty
+    if [ -z "$project" ] || [ -z "$exp_id" ]; then
+        echo -e "${RED}ERROR: Failed to parse CSV row $JOB_NUMBER${NC}"
+        echo "  Raw row: $row"
+        echo "  COL_ID=$COL_ID, COL_PROJECT=$COL_PROJECT"
+        echo "  Parsed ID='$exp_id', Project='$project'"
+        continue
+    fi
 
     # If ID doesn't contain underscore, format as {Project}_E{ID}
     # Otherwise use the ID as-is (assumes it's already a full experiment ID)
