@@ -1,187 +1,118 @@
-# Prompt History - XNAT Batch Performance Testing
+# Batch Performance Testing Scripts - Session Summary
+Date: 2025-11-18
+Project: xnat_misc/batch-performance-testing
 
-**Date:** 2025-11-13
-**Project:** xnat_misc/batch-performance-testing
+## Major Changes Completed
 
-## Objective
-Create scripts for batch container submission and workflow monitoring on XNAT to test performance at scale.
+### 1. Removed Experiment Creation (Pure Container Launcher)
+- **Before:** Script created synthetic MR sessions in XNAT before launching containers
+- **After:** Script only launches containers on EXISTING experiments
+- Simplified CSV format: only requires `ID` and `Project` columns
+- Removed: Subject, UID, Date columns (were for creating experiments)
 
-## Key Requirements
-1. Batch submit container jobs across multiple experiments
-2. Monitor workflow/container status with real-time updates
-3. Follow XNAT Container Service API best practices
-4. Support date range filtering and watch mode
-5. Query workflow table (authoritative source for job status)
+### 2. Added Workflow Monitoring (MANDATORY DEFAULT)
+- Script now WAITS for all jobs to complete before exiting
+- Polls workflow status every 10 seconds
+- Shows real-time: Running/Complete/Failed/Pending counts
+- Reports ACTUAL completion status (not just "queued")
+- Updates log with final execution results
+- No way to skip - this is the entire point of the script
 
-## Implementation Journey
+### 3. Added Debug Mode (-D flag)
+- Shows exact API request URL, headers, data
+- Shows HTTP response status and body
+- Provides copy-pastable curl command for manual testing
+- Helpful for diagnosing API errors (like HTTP 415)
 
-### Initial Approach
-- Started with container launch using JSON payload
-- Used project-scoped endpoints
-- Checked container API for status
+### 4. Added Bulk Submission Mode (-b flag)
+- Submits all experiments in single API call per project
+- Much faster: 1 API call per project vs N calls
+- Uses `/bulklaunch` endpoint
+- Automatically groups experiments by project
 
-### Key Learnings from xnat_pipeline_client
-1. **Launch payload must be form-encoded**, not JSON:
-   - ✅ `context=session&session=<EXPERIMENT_ID>`
-   - ❌ `{"root-element-name": "<EXPERIMENT_ID>"}`
+### 5. Fixed macOS Compatibility
+- Replaced `grep -P` (GNU) with `sed` (BSD compatible)
+- Fixed HTML title extraction for error messages
 
-2. **Endpoint structure**:
-   - `/xapi/wrappers/{id}/root/{rootElement}/launch`
-   - Not project-scoped (works but unnecessary)
+### 6. Optimized -m Flag
+- When `-m 5` specified, only reads first 5 CSV rows
+- Never reads entire CSV when limit specified
+- More efficient with large files (e.g., 21,793 rows)
 
-3. **Workflow table is authoritative**:
-   - Always check workflows for job status
-   - Container API may lag or not show all job types
-   - Some wrappers (debug-session) create workflows without containers
+### 7. Fixed API URL
+- **Before:** `/xapi/projects/{project}/wrappers/{id}/root/xnat:imageSessionData/launch` (HTTP 415)
+- **After:** `/xapi/wrappers/{id}/root/xnat:imageSessionData/launch` (HTTP 200)
+- Project context inferred from session ID, not URL path
 
-### Workflow API Discovery
-- Initial attempts used GET `/data/projects/{project}/workflows?format=json` - timed out
-- Correct approach from browser inspection:
-  - POST to `/xapi/workflows`
-  - JSON payload: `{"page":1,"id":"PROJECT","data_type":"xnat:projectData","sortable":true,"days":N}`
-  - Returns array of workflow objects
-  - Server-side filtering by days parameter
+## CSV Format
 
-### Final Architecture
-
-**batch_test.sh:**
-1. Authenticate → get JSESSION
-2. Show top 10 projects by experiment count
-3. List containers (enabled/disabled for selected project)
-4. Auto-enable wrapper if disabled
-5. Test first experiment, show response
-6. Batch submit with form-encoded data
-7. Track success/failure
-
-**check_status.sh:**
-1. POST to `/xapi/workflows` with project filter and days range
-2. Parse workflow array (not ResultSet)
-3. Extract fields: status, name, label, launchTime, percentComplete
-4. Format Unix timestamps (milliseconds → date)
-5. Display summary, status breakdown, recent 20 workflows
-6. Support watch mode (-w flag)
-
-## API Endpoints Used
-
-### Container Launch
-```bash
-POST /xapi/wrappers/{wrapper_id}/root/xnat:imageSessionData/launch
-Content-Type: application/x-www-form-urlencoded
-
-context=session&session=<EXPERIMENT_ID>
+### New Format (Simple)
+```csv
+ID,Project
+00001,XNAT01
+00002,XNAT01
 ```
 
-### Workflow Query
-```bash
-POST /xapi/workflows
-Content-Type: application/json
-X-Requested-With: XMLHttpRequest
+### Supported ID Formats
+- Simple: `00001` → formatted as `XNAT01_E00001`
+- Full: `XNAT01_E00001` → used as-is
 
-{
-  "page": 1,
-  "id": "PROJECT_ID",
-  "data_type": "xnat:projectData",
-  "sortable": true,
-  "days": 7
-}
+## Usage Examples
+
+```bash
+# Dry-run validation (recommended first)
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper -d
+
+# Individual submission (default)
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper
+
+# Bulk submission (faster for large batches)
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper -b
+
+# With debug mode
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper -D
+
+# Limit to first 5 experiments
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper -m 5
+
+# With HTML report upload
+./batch_test_csv.sh -h $HOST -u $USER -p $PASS -f data.csv -c wrapper -r REPORTS
 ```
 
-### Wrapper Discovery
-```bash
-GET /xapi/commands
-Accept: application/json
-```
+## Key Features
 
-### Wrapper Enablement Check
-```bash
-GET /xapi/projects/{project}/wrappers/{wrapper_id}/enabled
+1. **Waits for Completion (MANDATORY)** - No bullshit reports
+2. **Multi-Project Support** - Automatically enables wrapper for each project
+3. **Dry-Run Mode** - Validate CSV without launching
+4. **Bulk Mode** - Single API call per project
+5. **Debug Mode** - Show exact API requests/responses
+6. **Flexible ID Format** - Simple or full experiment IDs
+7. **Case-Insensitive Headers** - ID = id = Id
+8. **Dynamic Column Parsing** - Columns in any order
 
-Returns: {"enabled-for-site":true,"enabled-for-project":true,"project":"PROJECT"}
-```
+## Files Modified
 
-### Wrapper Enable/Disable
-```bash
-PUT /xapi/projects/{project}/wrappers/{wrapper_id}/enabled
-Content-Type: text/plain
+- `batch_test_csv.sh` - Main CSV batch launcher
+- `batch_test.sh` - Original batch launcher (also updated for consistency)
+- `BATCH_LAUNCH_GUIDE.md` - Complete documentation rewrite
+- `example_*.csv` - New example files
 
-true
-```
+## Testing
 
-## Test Results
+Tested successfully on `http://localhost` XNAT:
+- CSV parsing: ✅
+- Individual submission: ✅ (HTTP 200)
+- Workflow monitoring: ✅
+- Debug output: ✅
+- Project-based wrapper enabling: ✅
 
-**Test Run:** 2025-11-13 11:43 AM
-**Project:** TOTALSEGMENTATOR
-**Wrapper:** debug-session (ID 70)
-**Experiments:** 51
-**Success Rate:** 51/51 (100%)
-**Status:** All Complete, 100% progress
+## Repository
 
-## Files Created
+Location: `xnat_misc/batch-performance-testing/`
+GitHub: https://github.com/mrjamesdickson/xnat_misc
+Branch: `main`
+Latest commit: `27023d6 Add bulk submission mode (-b flag) to batch_test_csv.sh`
 
-1. **batch_test.sh** - Main batch submission script
-2. **check_status.sh** - Workflow monitoring (updated to use workflows API)
-3. **check_workflows.sh** - Standalone workflow checker
-4. **check_workflows_simple.sh** - Simplified workflow viewer
-5. **debug_container.sh** - Container data structure inspector
-6. **README.md** - User documentation
-7. **BATCH_TEST_SUCCESS.md** - Test verification results
-8. **PROMPTS.md** - This file
+## Next Steps / Future Enhancements
 
-## Key Code Patterns
-
-### Form-Encoded Launch
-```bash
-curl -X POST \
-  -b "JSESSIONID=$JSESSION" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}/root/xnat:imageSessionData/launch" \
-  -d "context=session&session=${EXP_ID}"
-```
-
-### Workflow Query
-```bash
-WORKFLOW_QUERY="{\"page\":1,\"id\":\"$PROJECT_ID\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":$DAYS}"
-
-WORKFLOWS=$(curl -s -X POST \
-  -b "JSESSIONID=$JSESSION" \
-  -H "Content-Type: application/json" \
-  -H "X-Requested-With: XMLHttpRequest" \
-  "${XNAT_HOST}/xapi/workflows" \
-  -d "$WORKFLOW_QUERY")
-```
-
-### Unix Timestamp Conversion
-```bash
-if [[ "$launch_time" =~ ^[0-9]+$ ]]; then
-    launch_sec=$((launch_time / 1000))
-    launch_fmt=$(date -r "$launch_sec" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || \
-                 date -d "@$launch_sec" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)
-fi
-```
-
-## Lessons Learned
-
-1. **Always check browser network traffic** for correct API usage
-2. **Workflow table is the source of truth** for job status
-3. **Form encoding vs JSON matters** - XNAT launch expects form data
-4. **Test wrappers (debug-session) don't create containers** - only workflows
-5. **Server-side filtering is faster** than client-side (use `days` parameter)
-6. **Unix timestamps in milliseconds** need division by 1000 for date conversion
-7. **Session persistence** - JSESSIONID cookie must be maintained across requests
-
-## Next Steps / Potential Enhancements
-
-- [ ] Add parallel submission with concurrency control
-- [ ] Export results to CSV/JSON
-- [ ] Add workflow retry logic for failed jobs
-- [ ] Support bulk operations across multiple projects
-- [ ] Add performance metrics (jobs/sec, avg completion time)
-- [ ] Integration with xnat_pipeline_client Python library
-- [ ] Support for scan-level and assessor-level containers
-- [ ] Email notifications on batch completion
-
-## References
-
-- xnat_pipeline_client: ~/projects/xnat_pipeline_client
-- XNAT proxy site plugin: ~/projects/xnat_proxy_site_plugin
-- XNAT Container Service docs: Container launch uses form data, not JSON
+- None pending - all requested features implemented
