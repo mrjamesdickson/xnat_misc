@@ -470,16 +470,15 @@ echo -e "${GREEN}✓ CSV header validated${NC}"
 echo "  Required columns found: ID (col $COL_ID), Project (col $COL_PROJECT)"
 echo ""
 
-# Count experiments in CSV (exclude header)
-CSV_EXPERIMENT_COUNT=$(tail -n +2 "$CSV_FILE" | wc -l | tr -d ' ')
-echo -e "${GREEN}✓ Found $CSV_EXPERIMENT_COUNT experiments in CSV${NC}"
-
-# Apply max jobs limit early for efficiency
-if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ] && [ "$MAX_JOBS" -lt "$CSV_EXPERIMENT_COUNT" ]; then
+# Determine how many experiments to process
+if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ]; then
+    # User specified a limit - use it directly without reading entire CSV
     EXPERIMENT_COUNT="$MAX_JOBS"
-    echo -e "${YELLOW}Limiting to first $MAX_JOBS experiments${NC}"
+    echo -e "${GREEN}✓ Processing first $EXPERIMENT_COUNT experiments from CSV${NC}"
 else
-    EXPERIMENT_COUNT="$CSV_EXPERIMENT_COUNT"
+    # No limit specified - count all experiments in CSV
+    EXPERIMENT_COUNT=$(tail -n +2 "$CSV_FILE" | wc -l | tr -d ' ')
+    echo -e "${GREEN}✓ Found $EXPERIMENT_COUNT experiments in CSV${NC}"
 fi
 echo ""
 
@@ -509,8 +508,8 @@ echo "$PROJECTS" | while read -r proj; do
     printf "  %-15s (%d experiments)\n" "$proj" "$COUNT"
 done
 echo ""
-if [ "$EXPERIMENT_COUNT" -lt "$CSV_EXPERIMENT_COUNT" ]; then
-    echo "Total: $EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s) (limited from $CSV_EXPERIMENT_COUNT total in CSV)"
+if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ]; then
+    echo "Total: $EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s) (limited by -m flag)"
 else
     echo "Total: $EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s)"
 fi
