@@ -394,7 +394,7 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-d] [-D]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-b] [-d] [-D]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -402,6 +402,7 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
+    echo "  -b  Use bulk submission (submit all sessions in a single API call per project)"
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
     echo ""
@@ -431,7 +432,8 @@ usage() {
 # Parse arguments
 DRY_RUN=false
 DEBUG=false
-while getopts "h:u:p:f:c:m:r:dD" opt; do
+BULK_MODE=false
+while getopts "h:u:p:f:c:m:r:bdD" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -440,6 +442,7 @@ while getopts "h:u:p:f:c:m:r:dD" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
+        b) BULK_MODE=true ;;
         d) DRY_RUN=true ;;
         D) DEBUG=true ;;
         *) usage ;;
@@ -757,9 +760,95 @@ EOF
 echo "Logging to: $LOG_FILE"
 echo ""
 
-# Submit jobs - read CSV and submit for each row
-JOB_NUMBER=0
-tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
+# Bulk submission mode
+if [ "$BULK_MODE" = true ]; then
+    echo -e "${YELLOW}Using bulk submission mode (one API call per project)${NC}"
+    echo ""
+
+    for project in $PROJECTS; do
+        # Collect all experiment IDs for this project
+        PROJECT_EXPERIMENTS=()
+        while IFS= read -r row; do
+            proj=$(get_csv_value "$row" "$COL_PROJECT")
+            exp_id=$(get_csv_value "$row" "$COL_ID")
+
+            if [ "$proj" = "$project" ]; then
+                # Format experiment ID if needed
+                if [[ "$exp_id" != *_* ]]; then
+                    EXP_ID="${project}_E${exp_id}"
+                else
+                    EXP_ID="$exp_id"
+                fi
+                PROJECT_EXPERIMENTS+=("$EXP_ID")
+            fi
+        done < <(tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT")
+
+        PROJ_COUNT=${#PROJECT_EXPERIMENTS[@]}
+        if [ "$PROJ_COUNT" -eq 0 ]; then
+            continue
+        fi
+
+        echo -e "${BLUE}Submitting $PROJ_COUNT experiments for project $project in bulk...${NC}"
+
+        # Build JSON array of experiment paths
+        SESSION_ARRAY=$(printf '/archive/experiments/%s\n' "${PROJECT_EXPERIMENTS[@]}" | jq -R . | jq -s .)
+        BULK_PAYLOAD=$(jq -n --argjson sessions "$SESSION_ARRAY" '{"session": ($sessions | tostring)}')
+
+        if [ "$DEBUG" = true ]; then
+            echo ""
+            echo -e "${YELLOW}=== DEBUG: BULK API REQUEST ===${NC}"
+            echo "URL: ${XNAT_HOST}/xapi/projects/${project}/wrappers/${WRAPPER_ID}/root/session/bulklaunch"
+            echo "Method: POST"
+            echo "Payload:"
+            echo "$BULK_PAYLOAD" | jq '.'
+            echo ""
+        fi
+
+        BULK_START_TIME=$(date +%s.%N)
+
+        BULK_RESPONSE=$(curl_job_submit \
+            -w "\n%{http_code}" \
+            -X POST \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            "${XNAT_HOST}/xapi/projects/${project}/wrappers/${WRAPPER_ID}/root/session/bulklaunch" \
+            -d "$BULK_PAYLOAD")
+
+        BULK_END_TIME=$(date +%s.%N)
+        BULK_DURATION=$(echo "$BULK_END_TIME - $BULK_START_TIME" | bc)
+
+        # Parse response - last line is HTTP code, rest is body
+        BULK_HTTP_CODE=$(echo "$BULK_RESPONSE" | tail -1)
+        BULK_BODY=$(echo "$BULK_RESPONSE" | head -n -1)
+
+        echo "Bulk submission completed in ${BULK_DURATION}s"
+        echo "HTTP Status: $BULK_HTTP_CODE"
+
+        if [ "$BULK_HTTP_CODE" = "200" ] || [ "$BULK_HTTP_CODE" = "201" ]; then
+            echo -e "${GREEN}✓ Successfully submitted $PROJ_COUNT experiments for project $project${NC}"
+            SUCCESS_COUNT=$((SUCCESS_COUNT + PROJ_COUNT))
+        else
+            echo -e "${RED}✗ Bulk submission failed for project $project${NC}"
+            echo "Response: $BULK_BODY"
+            FAIL_COUNT=$((FAIL_COUNT + PROJ_COUNT))
+        fi
+        echo ""
+
+        # Log bulk submission
+        cat >> "$LOG_FILE" <<EOF
+[$(date '+%Y-%m-%d %H:%M:%S')] BULK SUBMISSION - $project
+  Experiments: $PROJ_COUNT
+  Duration: ${BULK_DURATION}s
+  HTTP Status: $BULK_HTTP_CODE
+  Experiments: ${PROJECT_EXPERIMENTS[*]}
+
+EOF
+    done
+else
+    # Individual submission mode - submit jobs one by one
+    JOB_NUMBER=0
+    tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
     JOB_NUMBER=$((JOB_NUMBER + 1))
 
     # Extract values using dynamic column indices
@@ -827,20 +916,23 @@ EOF
 
 EOF
     fi
-done
+    done
+fi  # End of bulk mode check
 
 BATCH_END_TIME=$(date +%s)
 BATCH_END_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 TOTAL_DURATION=$((BATCH_END_TIME - BATCH_START_TIME))
 
-# Count results
-if [ -f "$RESULTS_FILE" ]; then
-    SUCCESS_COUNT=$(grep -c "SUCCESS" "$RESULTS_FILE" 2>/dev/null || echo "0")
-    FAIL_COUNT=$(grep -c "FAIL" "$RESULTS_FILE" 2>/dev/null || echo "0")
-    rm "$RESULTS_FILE"
-else
-    SUCCESS_COUNT=0
-    FAIL_COUNT=0
+# Count results (skip if bulk mode already set counts)
+if [ "$BULK_MODE" = false ]; then
+    if [ -f "$RESULTS_FILE" ]; then
+        SUCCESS_COUNT=$(grep -c "SUCCESS" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        FAIL_COUNT=$(grep -c "FAIL" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        rm "$RESULTS_FILE"
+    else
+        SUCCESS_COUNT=0
+        FAIL_COUNT=0
+    fi
 fi
 
 # Calculate timing statistics
@@ -896,6 +988,7 @@ Test Configuration:
   CSV File: $CSV_FILE
   Projects: $PROJECT_COUNT unique project(s)
   Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
+  Submission Mode: $([ "$BULK_MODE" = true ] && echo "Bulk" || echo "Individual")
   Max Jobs Limit: ${MAX_JOBS:-None}
   Host: $XNAT_HOST
   User: $USERNAME
