@@ -19,6 +19,9 @@ Tools for testing XNAT container batch submission performance and monitoring wor
 ### `batch_test.sh` - Batch Container Submission ✅
 Submits container jobs in batch across multiple experiments.
 
+### `batch_test_csv.sh` - CSV-Based Batch Submission ✅
+Submits container jobs based on experiment data from a CSV file. Can create experiments in XNAT or use existing ones.
+
 **Usage:**
 ```bash
 ./batch_test.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>]
@@ -67,6 +70,94 @@ Submits container jobs in batch across multiple experiments.
 6. **Monitor job execution until completion** (10s polling)
 7. Report final status with completion counts
 8. **Generate and upload HTML report (if `-r` specified)**
+
+### `batch_test_csv.sh` - CSV-Based Batch Submission ✅
+Submits container jobs based on experiment metadata from a CSV file.
+
+**Usage:**
+```bash
+./batch_test_csv.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-s]
+```
+
+**Example:**
+```bash
+# Create experiments from CSV and submit jobs
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -c totalsegmentator-scan
+
+# Use existing experiments (skip creation)
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -c dcm2niix-scan -s
+
+# Limit to first 10 experiments
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -m 10
+```
+
+**CSV Format:**
+The CSV file must have the following header (case-sensitive):
+```
+Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
+```
+
+**CSV Columns:**
+- `Label` - Experiment label (e.g., EXP001)
+- `Subject` - Subject ID (e.g., SUBJ001)
+- `Date` - Session date (YYYY-MM-DD format)
+- `Gender` - Patient gender (M/F)
+- `Age` - Patient age
+- `dcmAccessionNumber` - DICOM accession number
+- `dcmPatientId` - DICOM patient ID
+- `dcmPatientName` - DICOM patient name (use ^ separator)
+- `UID` - Session UID (DICOM StudyInstanceUID)
+- `Scans` - Number of scans or comma-separated scan IDs
+- `Project` - XNAT project ID
+
+**Example CSV:**
+```csv
+Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
+EXP001,SUBJ001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,TestProject
+EXP002,SUBJ002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,TestProject
+```
+
+**Example CSV Files:**
+- `example_batch.csv` - Single project example
+- `example_multi_project.csv` - Multiple projects example (demonstrates automatic per-project container enablement)
+
+**Options:**
+- `-h` XNAT host (required)
+- `-u` Username (required)
+- `-p` Password (required)
+- `-f` CSV file path (required)
+- `-c` Container wrapper name/ID (optional - interactive if not provided)
+- `-m` Maximum jobs to submit (optional - defaults to all experiments in CSV)
+- `-r` Report project ID to upload results to (optional)
+- `-s` Skip creating experiments (assumes they already exist in XNAT)
+
+**Features:**
+- Reads experiment metadata from CSV file
+- Creates MR sessions in XNAT if they don't exist (unless `-s` specified)
+- **Handles multiple projects in one CSV** - automatically enables container for each unique project
+- Auto-enables disabled containers on a per-project basis
+- Submits jobs using the correct project context for each experiment
+- Tracks success/failure for each submission
+- Retries failed submissions with logging
+- Performance metrics (throughput, avg/min/max times)
+- Detailed logs saved to `logs/YYYY-MM-DD/`
+- Auto-generates and uploads HTML report if `-r` specified
+
+**Workflow:**
+1. Authenticate → Parse CSV file
+2. Identify all unique projects from CSV
+3. Select wrapper
+4. **Enable wrapper for ALL projects** found in CSV (automatic)
+5. Create experiments in XNAT (unless `-s` flag set)
+6. Submit container jobs (using correct project for each experiment)
+7. Report final status with performance metrics
+8. Generate and upload HTML report (if `-r` specified)
+
+**Use Cases:**
+- Bulk importing and processing external imaging data
+- Reprocessing experiments based on a predefined list
+- Testing with synthetic/example data
+- Batch processing across multiple projects
 
 ### `check_status.sh` - Workflow Status Monitor ✅
 Monitors workflow job status for a project (queries XNAT workflow table).
@@ -225,6 +316,40 @@ Each test run gets its own subfolder with:
 
 # 2. Monitor workflows
 ./check_status.sh -h https://demo02.xnat.org -u admin -p password -j RADVAL -r today
+```
+
+### CSV-based batch submission workflow:
+```bash
+# 1. Create CSV file with experiment data
+cat > my_experiments.csv <<EOF
+Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
+EXP001,SUBJ001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,MyProject
+EXP002,SUBJ002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,MyProject
+EOF
+
+# 2. Run CSV batch test (creates experiments and submits jobs)
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f my_experiments.csv -c totalsegmentator-scan -r RADVAL
+
+# 3. Monitor workflows
+./check_status.sh -h https://demo02.xnat.org -u admin -p password -j MyProject -r today
+```
+
+### Using existing experiments from CSV:
+```bash
+# If experiments already exist, use -s flag to skip creation
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f my_experiments.csv -c dcm2niix-scan -s
+```
+
+### Multi-project CSV workflow:
+```bash
+# Use example multi-project CSV (experiments span ProjectA, ProjectB, ProjectC)
+# The script will automatically enable the container for all 3 projects
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_multi_project.csv -c totalsegmentator-scan
+
+# Output will show:
+# - Projects found: ProjectA, ProjectB, ProjectC
+# - Container enabled for each project
+# - Jobs submitted with correct project context
 ```
 
 ### Generate report from existing log:
