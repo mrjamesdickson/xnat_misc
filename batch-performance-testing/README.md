@@ -142,7 +142,7 @@ Generated:
 **Important:**
 - ✅ Columns can be in **any order**
 - ✅ **Extra columns** are ignored
-- ✅ Column names are **case-sensitive**
+- ✅ Column names are **case-insensitive** (ID, id, Id all work)
 
 **Example CSV (minimal - required only):**
 ```csv

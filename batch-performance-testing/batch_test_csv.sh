@@ -330,22 +330,23 @@ parse_csv_header() {
     unset COL_ACCESSION COL_PATIENT_ID COL_PATIENT_NAME COL_UID COL_SCANS COL_PROJECT
 
     for col_name in $header; do
-        # Trim whitespace
+        # Trim whitespace and convert to lowercase for comparison
         col_name=$(echo "$col_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        col_name_lower=$(echo "$col_name" | tr '[:upper:]' '[:lower:]')
 
-        case "$col_name" in
-            ID) COL_ID=$col_num ;;
-            Label) COL_LABEL=$col_num ;;
-            Subject) COL_SUBJECT=$col_num ;;
-            Date) COL_DATE=$col_num ;;
-            Gender) COL_GENDER=$col_num ;;
-            Age) COL_AGE=$col_num ;;
-            dcmAccessionNumber) COL_ACCESSION=$col_num ;;
-            dcmPatientId) COL_PATIENT_ID=$col_num ;;
-            dcmPatientName) COL_PATIENT_NAME=$col_num ;;
-            UID) COL_UID=$col_num ;;
-            Scans) COL_SCANS=$col_num ;;
-            Project) COL_PROJECT=$col_num ;;
+        case "$col_name_lower" in
+            id) COL_ID=$col_num ;;
+            label) COL_LABEL=$col_num ;;
+            subject) COL_SUBJECT=$col_num ;;
+            date) COL_DATE=$col_num ;;
+            gender) COL_GENDER=$col_num ;;
+            age) COL_AGE=$col_num ;;
+            dcmaccessionnumber) COL_ACCESSION=$col_num ;;
+            dcmpatientid) COL_PATIENT_ID=$col_num ;;
+            dcmpatientname) COL_PATIENT_NAME=$col_num ;;
+            uid) COL_UID=$col_num ;;
+            scans) COL_SCANS=$col_num ;;
+            project) COL_PROJECT=$col_num ;;
         esac
         col_num=$((col_num + 1))
     done
