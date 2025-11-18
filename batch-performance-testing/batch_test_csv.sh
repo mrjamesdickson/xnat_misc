@@ -326,8 +326,7 @@ parse_csv_header() {
     local col_num=1
 
     # Clear any existing mappings
-    unset COL_ID COL_LABEL COL_SUBJECT COL_DATE COL_GENDER COL_AGE
-    unset COL_ACCESSION COL_PATIENT_ID COL_PATIENT_NAME COL_UID COL_SCANS COL_PROJECT
+    unset COL_ID COL_PROJECT
 
     for col_name in $header; do
         # Trim whitespace and convert to lowercase for comparison
@@ -336,16 +335,6 @@ parse_csv_header() {
 
         case "$col_name_lower" in
             id) COL_ID=$col_num ;;
-            label) COL_LABEL=$col_num ;;
-            subject) COL_SUBJECT=$col_num ;;
-            date) COL_DATE=$col_num ;;
-            gender) COL_GENDER=$col_num ;;
-            age) COL_AGE=$col_num ;;
-            dcmaccessionnumber) COL_ACCESSION=$col_num ;;
-            dcmpatientid) COL_PATIENT_ID=$col_num ;;
-            dcmpatientname) COL_PATIENT_NAME=$col_num ;;
-            uid) COL_UID=$col_num ;;
-            scans) COL_SCANS=$col_num ;;
             project) COL_PROJECT=$col_num ;;
         esac
         col_num=$((col_num + 1))
@@ -354,8 +343,6 @@ parse_csv_header() {
     # Validate required columns exist
     local missing_cols=""
     [ -z "$COL_ID" ] && missing_cols="${missing_cols}ID "
-    [ -z "$COL_SUBJECT" ] && missing_cols="${missing_cols}Subject "
-    [ -z "$COL_UID" ] && missing_cols="${missing_cols}UID "
     [ -z "$COL_PROJECT" ] && missing_cols="${missing_cols}Project "
 
     if [ -n "$missing_cols" ]; then
@@ -375,40 +362,42 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-s]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-d]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
-    echo "  -f  CSV file with experiment data (required)"
+    echo "  -f  CSV file with experiment IDs (required)"
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
-    echo "  -s  Skip creating sessions (assumes experiments already exist in XNAT)"
+    echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo ""
     echo "Required CSV columns (can be in any order, extra columns ignored):"
-    echo "  ID, Subject, UID, Project"
+    echo "  ID, Project"
     echo ""
-    echo "Optional CSV columns:"
-    echo "  Date, Label, Gender, Age, dcmAccessionNumber, dcmPatientId, dcmPatientName, Scans"
+    echo "ID Format:"
+    echo "  - Simple ID (e.g., 00001) - will be formatted as {Project}_E{ID}"
+    echo "  - Full experiment ID (e.g., XNAT01_E00001) - used as-is"
     echo ""
-    echo "Example CSV (minimal):"
-    echo '  ID,Subject,UID,Project'
-    echo '  00001,00001,1.2.840.113619.2.1.1.1,XNAT01'
-    echo '  00002,00002,1.2.840.113619.2.1.1.2,XNAT01'
+    echo "Example CSV (simple IDs):"
+    echo '  ID,Project'
+    echo '  00001,XNAT01'
+    echo '  00002,XNAT01'
     echo ""
-    echo "Example CSV (with optional columns):"
-    echo '  ID,Subject,UID,Project,Date,Gender'
-    echo '  00001,00001,1.2.840.113619.2.1.1.1,XNAT01,2024-01-15,M'
-    echo '  00002,00001,1.2.840.113619.2.1.1.2,XNAT01,2024-01-16,F'
+    echo "Example CSV (full experiment IDs):"
+    echo '  ID,Project'
+    echo '  XNAT01_E00001,XNAT01'
+    echo '  XNAT01_E00002,XNAT01'
     echo ""
     echo "Note: Columns can be in any order. Extra columns are ignored."
     echo "      Each row can specify a different project."
+    echo "      Experiments must already exist in XNAT."
     exit 1
 }
 
 # Parse arguments
-SKIP_CREATE=false
-while getopts "h:u:p:f:c:m:r:s" opt; do
+DRY_RUN=false
+while getopts "h:u:p:f:c:m:r:d" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -417,7 +406,7 @@ while getopts "h:u:p:f:c:m:r:s" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
-        s) SKIP_CREATE=true ;;
+        d) DRY_RUN=true ;;
         *) usage ;;
     esac
 done
@@ -435,10 +424,16 @@ fi
 # Remove trailing slash from host
 XNAT_HOST="${XNAT_HOST%/}"
 
-echo -e "${GREEN}=== XNAT CSV Batch Performance Testing ===${NC}"
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${BLUE}=== XNAT CSV Batch Container Launch - DRY RUN MODE ===${NC}"
+    echo -e "${YELLOW}No containers will be launched. Validating CSV only.${NC}"
+else
+    echo -e "${GREEN}=== XNAT CSV Batch Container Launch ===${NC}"
+fi
 echo "Host: $XNAT_HOST"
 echo "User: $USERNAME"
 echo "CSV File: $CSV_FILE"
+[ "$DRY_RUN" = true ] && echo "Mode: DRY RUN"
 echo ""
 
 # Step 1: Authenticate
@@ -472,32 +467,32 @@ if ! parse_csv_header "$CSV_HEADER"; then
 fi
 
 echo -e "${GREEN}✓ CSV header validated${NC}"
-echo "  Required columns found: ID (col $COL_ID), Subject (col $COL_SUBJECT), UID (col $COL_UID), Project (col $COL_PROJECT)"
-[ -n "$COL_DATE" ] && echo "  Optional: Date (col $COL_DATE)"
-[ -n "$COL_LABEL" ] && echo "  Optional: Label (col $COL_LABEL)"
-[ -n "$COL_GENDER" ] && echo "  Optional: Gender (col $COL_GENDER)"
-[ -n "$COL_AGE" ] && echo "  Optional: Age (col $COL_AGE)"
-[ -n "$COL_ACCESSION" ] && echo "  Optional: dcmAccessionNumber (col $COL_ACCESSION)"
-[ -n "$COL_PATIENT_ID" ] && echo "  Optional: dcmPatientId (col $COL_PATIENT_ID)"
-[ -n "$COL_PATIENT_NAME" ] && echo "  Optional: dcmPatientName (col $COL_PATIENT_NAME)"
-[ -n "$COL_SCANS" ] && echo "  Optional: Scans (col $COL_SCANS)"
+echo "  Required columns found: ID (col $COL_ID), Project (col $COL_PROJECT)"
 echo ""
 
 # Count experiments in CSV (exclude header)
 CSV_EXPERIMENT_COUNT=$(tail -n +2 "$CSV_FILE" | wc -l | tr -d ' ')
 echo -e "${GREEN}✓ Found $CSV_EXPERIMENT_COUNT experiments in CSV${NC}"
+
+# Apply max jobs limit early for efficiency
+if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ] && [ "$MAX_JOBS" -lt "$CSV_EXPERIMENT_COUNT" ]; then
+    EXPERIMENT_COUNT="$MAX_JOBS"
+    echo -e "${YELLOW}Limiting to first $MAX_JOBS experiments${NC}"
+else
+    EXPERIMENT_COUNT="$CSV_EXPERIMENT_COUNT"
+fi
 echo ""
 
-# Extract unique projects from CSV using dynamic column index
-PROJECTS=$(tail -n +2 "$CSV_FILE" | awk -F',' -v col="$COL_PROJECT" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); print $col}' | sort -u)
+# Extract unique projects from CSV (only from rows we'll process)
+PROJECTS=$(tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | awk -F',' -v col="$COL_PROJECT" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); print $col}' | sort -u)
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -l | tr -d ' ')
 
-echo "Projects found in CSV:"
+echo "Projects found in selected experiments:"
 echo "$PROJECTS" | nl -w 3 -s '. '
 echo ""
 
 if [ "$PROJECT_COUNT" -eq 1 ]; then
-    echo -e "${GREEN}All experiments use a single project${NC}"
+    echo -e "${GREEN}All selected experiments use a single project${NC}"
 else
     echo -e "${YELLOW}Multiple projects detected - container will be enabled for each${NC}"
 fi
@@ -525,19 +520,15 @@ if [[ ! "$PROJECT_CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
 fi
 echo ""
 
-# Show first few experiments
-echo "First 5 experiments from CSV:"
-tail -n +2 "$CSV_FILE" | head -5 | nl -w 3 -s '. '
-echo ""
-
-# Apply max jobs limit if specified
-if [ -n "$MAX_JOBS" ] && [ "$MAX_JOBS" -gt 0 ] && [ "$MAX_JOBS" -lt "$CSV_EXPERIMENT_COUNT" ]; then
-    EXPERIMENT_COUNT="$MAX_JOBS"
-    echo -e "${YELLOW}Limiting to $MAX_JOBS experiments${NC}"
-    echo ""
+# Show selected experiments
+if [ "$EXPERIMENT_COUNT" -le 5 ]; then
+    echo "Experiments to process:"
+    tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | nl -w 3 -s '. '
 else
-    EXPERIMENT_COUNT="$CSV_EXPERIMENT_COUNT"
+    echo "First 5 of $EXPERIMENT_COUNT experiments:"
+    tail -n +2 "$CSV_FILE" | head -5 | nl -w 3 -s '. '
 fi
+echo ""
 
 # Step 3: Select container
 echo -e "${YELLOW}[3/5] Container selection...${NC}"
@@ -595,150 +586,87 @@ echo -e "${GREEN}✓ Container: $CONTAINER_NAME (ID: $WRAPPER_ID)${NC}"
 echo ""
 
 # Step 4: Enable wrapper for all projects in CSV
-echo -e "${YELLOW}[4/5] Enabling wrapper for all projects...${NC}"
-echo ""
-
-ENABLE_ERROR=false
-for project in $PROJECTS; do
-    if ! enable_wrapper_for_project "$project" "$WRAPPER_ID"; then
-        echo -e "${RED}Failed to enable wrapper for project: $project${NC}"
-        ENABLE_ERROR=true
-    fi
-done
-echo ""
-
-if [ "$ENABLE_ERROR" = true ]; then
-    echo -e "${RED}Some projects failed to enable the wrapper${NC}"
-    read -p "Continue anyway? (y/yes): " CONTINUE_ANYWAY
-    if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-        echo "Aborted."
-        rm -f "$ENABLED_PROJECTS_FILE"
-        exit 1
-    fi
-fi
-
-# Step 5: Create/verify experiments
-if [ "$SKIP_CREATE" = false ]; then
-    echo -e "${YELLOW}[5/5] Creating/verifying experiments in XNAT...${NC}"
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}[4/5] DRY RUN: Would enable wrapper for projects...${NC}"
     echo ""
-    echo -e "${BLUE}Note: This will create MR sessions in XNAT if they don't exist${NC}"
+    for project in $PROJECTS; do
+        echo -e "${BLUE}  Would enable wrapper ${WRAPPER_ID} for project: $project${NC}"
+    done
     echo ""
-    read -p "Continue with experiment creation? (y/yes): " CREATE_CONFIRM
-
-    if [[ ! "$CREATE_CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-        echo "Skipping experiment creation. Use -s flag to skip this step in future."
-        SKIP_CREATE=true
-    else
-        echo "Creating experiments..."
-        echo ""
-
-        CREATE_COUNT=0
-        SKIP_COUNT=0
-        ERROR_COUNT=0
-
-        # Read CSV and create experiments
-        tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
-            # Extract values using dynamic column indices
-            subj_label=$(get_csv_value "$row" "$COL_SUBJECT")
-            project=$(get_csv_value "$row" "$COL_PROJECT")
-            exp_label=$(get_csv_value "$row" "$COL_ID")
-
-            # Optional: get date if column exists
-            if [ -n "$COL_DATE" ]; then
-                date=$(get_csv_value "$row" "$COL_DATE")
-            else
-                date=$(date '+%Y-%m-%d')  # Use current date if not provided
-            fi
-
-            # Build IDs in XNAT format: {Project}_E{ID} and {Project}_S{Subject}
-            EXP_ID="${project}_E${exp_label}"
-            SUBJ_ID="${project}_S${subj_label}"
-
-            # Step 1: Create/verify subject exists
-            SUBJ_CHECK=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${project}/subjects/${SUBJ_ID}?format=json" 2>/dev/null)
-
-            if ! echo "$SUBJ_CHECK" | jq -e '.items[0]' >/dev/null 2>&1; then
-                # Subject doesn't exist, create it
-                SUBJ_CREATE=$(curl_api -w "\nHTTP_CODE:%{http_code}" -X PUT \
-                    -b "JSESSIONID=$JSESSION" \
-                    -H "Content-Type: application/xml" \
-                    "${XNAT_HOST}/data/projects/${project}/subjects/${SUBJ_ID}" \
-                    -d "<Subject xmlns=\"http://nrg.wustl.edu/xnat\" ID=\"${SUBJ_ID}\" project=\"${project}\" label=\"${subj_label}\"/>")
-
-                SUBJ_HTTP_CODE=$(echo "$SUBJ_CREATE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-
-                if [[ "$SUBJ_HTTP_CODE" =~ ^(200|201)$ ]]; then
-                    echo -e "${BLUE}  Created subject: $SUBJ_ID (label: $subj_label)${NC}"
-                else
-                    echo -e "${RED}✗${NC} Failed to create subject $SUBJ_ID (HTTP $SUBJ_HTTP_CODE)"
-                    ERROR_COUNT=$((ERROR_COUNT + 1))
-                    continue
-                fi
-            fi
-
-            # Step 2: Check if experiment already exists
-            CHECK_RESULT=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/experiments/${EXP_ID}?format=json" 2>/dev/null)
-
-            if echo "$CHECK_RESULT" | jq -e '.items[0]' >/dev/null 2>&1; then
-                echo -e "${YELLOW}⚠${NC} $EXP_ID already exists, skipping creation"
-                SKIP_COUNT=$((SKIP_COUNT + 1))
-                continue
-            fi
-
-            # Step 3: Create experiment (MR Session) with proper subject_ID
-            CREATE_XML="<MRSession xmlns=\"http://nrg.wustl.edu/xnat\" xmlns:xnat=\"http://nrg.wustl.edu/xnat\" ID=\"${EXP_ID}\" project=\"${project}\" label=\"${exp_label}\">
-  <xnat:subject_ID>${SUBJ_ID}</xnat:subject_ID>
-  <xnat:date>${date}</xnat:date>
-</MRSession>"
-
-            CREATE_RESULT=$(curl_api -w "\nHTTP_CODE:%{http_code}" -X PUT \
-                -b "JSESSIONID=$JSESSION" \
-                -H "Content-Type: application/xml" \
-                "${XNAT_HOST}/data/projects/${project}/experiments/${EXP_ID}?xsiType=xnat:mrSessionData" \
-                -d "$CREATE_XML")
-
-            HTTP_CODE=$(echo "$CREATE_RESULT" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-                echo -e "${GREEN}✓${NC} Created experiment $EXP_ID (label: $exp_label) for subject $SUBJ_ID"
-                CREATE_COUNT=$((CREATE_COUNT + 1))
-            else
-                echo -e "${RED}✗${NC} Failed to create experiment $EXP_ID (HTTP $HTTP_CODE)"
-                ERROR_COUNT=$((ERROR_COUNT + 1))
-            fi
-        done
-
-        echo ""
-        echo "Experiment creation complete:"
-        echo "  Created: $CREATE_COUNT"
-        echo "  Skipped (already exists): $SKIP_COUNT"
-        echo "  Errors: $ERROR_COUNT"
-        echo ""
-    fi
 else
-    echo -e "${YELLOW}[5/5] Skipping experiment creation (-s flag)${NC}"
-    echo "Assuming experiments already exist in XNAT"
+    echo -e "${YELLOW}[4/5] Enabling wrapper for all projects...${NC}"
     echo ""
+
+    ENABLE_ERROR=false
+    for project in $PROJECTS; do
+        if ! enable_wrapper_for_project "$project" "$WRAPPER_ID"; then
+            echo -e "${RED}Failed to enable wrapper for project: $project${NC}"
+            ENABLE_ERROR=true
+        fi
+    done
+    echo ""
+
+    if [ "$ENABLE_ERROR" = true ]; then
+        echo -e "${RED}Some projects failed to enable the wrapper${NC}"
+        read -p "Continue anyway? (y/yes): " CONTINUE_ANYWAY
+        if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+            echo "Aborted."
+            rm -f "$ENABLED_PROJECTS_FILE"
+            exit 1
+        fi
+    fi
 fi
+
+# Step 5: Verify experiments exist (optional check could be added here)
+echo -e "${YELLOW}[5/5] Ready to launch containers${NC}"
+echo "Note: Experiments must already exist in XNAT"
+echo ""
 
 # Prepare for submission
 echo -e "${YELLOW}Preparing for batch submission...${NC}"
 echo ""
 
-# Confirm batch submission
-echo -e "${YELLOW}=== READY TO SUBMIT BATCH ===${NC}"
-echo "Experiments: $EXPERIMENT_COUNT"
-echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
-echo "Projects: $PROJECT_COUNT unique project(s)"
-echo ""
-echo -e "${RED}This will create $EXPERIMENT_COUNT container jobs!${NC}"
-echo ""
-read -p "Continue with batch submission? (y/yes): " CONFIRM
+# Confirm batch submission or show dry-run summary
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${BLUE}=== DRY RUN SUMMARY ===${NC}"
+    echo "Experiments to launch: $EXPERIMENT_COUNT"
+    echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
+    echo "Projects: $PROJECT_COUNT unique project(s)"
+    echo ""
+    echo "Experiment IDs that would be launched:"
+    tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
+        project=$(get_csv_value "$row" "$COL_PROJECT")
+        exp_id=$(get_csv_value "$row" "$COL_ID")
 
-if [[ ! "$CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-    echo "Aborted."
+        if [[ "$exp_id" != *_* ]]; then
+            EXP_ID="${project}_E${exp_id}"
+        else
+            EXP_ID="$exp_id"
+        fi
+
+        echo "  - $EXP_ID (project: $project)"
+    done
+    echo ""
+    echo -e "${GREEN}✓ Dry-run validation complete${NC}"
+    echo "CSV is valid and ready for batch submission."
+    echo "Run without -d flag to launch containers."
     rm -f "$ENABLED_PROJECTS_FILE"
     exit 0
+else
+    echo -e "${YELLOW}=== READY TO SUBMIT BATCH ===${NC}"
+    echo "Experiments: $EXPERIMENT_COUNT"
+    echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
+    echo "Projects: $PROJECT_COUNT unique project(s)"
+    echo ""
+    echo -e "${RED}This will create $EXPERIMENT_COUNT container jobs!${NC}"
+    echo ""
+    read -p "Continue with batch submission? (y/yes): " CONFIRM
+
+    if [[ ! "$CONFIRM" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+        echo "Aborted."
+        rm -f "$ENABLED_PROJECTS_FILE"
+        exit 0
+    fi
 fi
 
 # Submit batch
@@ -761,7 +689,7 @@ TIMING_FILE="/tmp/batch_timing_$$.txt"
 # Write log header
 cat > "$LOG_FILE" <<EOF
 =================================================================
-XNAT CSV Batch Performance Test Log
+XNAT CSV Batch Container Launch Log
 =================================================================
 Test Started: $BATCH_START_TIMESTAMP
 Host: $XNAT_HOST
@@ -771,7 +699,6 @@ Container: $CONTAINER_NAME (Wrapper ID: $WRAPPER_ID)
 Projects: $PROJECT_COUNT unique project(s)
 Experiments to Process: $EXPERIMENT_COUNT
 Max Jobs Limit: ${MAX_JOBS:-None}
-Skip Create: $SKIP_CREATE
 Site Automation Enabled: ${AUTOMATION_ENABLED_VALUE}
 Automation Check Note: ${AUTOMATION_CHECK_NOTE}
 =================================================================
@@ -793,12 +720,17 @@ tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; d
 
     # Extract values using dynamic column indices
     project=$(get_csv_value "$row" "$COL_PROJECT")
-    exp_label=$(get_csv_value "$row" "$COL_ID")
+    exp_id=$(get_csv_value "$row" "$COL_ID")
 
-    # Build experiment ID in XNAT format: {Project}_E{ID}
-    EXP_ID="${project}_E${exp_label}"
+    # If ID doesn't contain underscore, format as {Project}_E{ID}
+    # Otherwise use the ID as-is (assumes it's already a full experiment ID)
+    if [[ "$exp_id" != *_* ]]; then
+        EXP_ID="${project}_E${exp_id}"
+    else
+        EXP_ID="$exp_id"
+    fi
 
-    echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID (label: $exp_label, project: $project)"
+    echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID (project: $project)"
     JOB_START_TIME=$(date +%s.%N)
 
     submit_job_with_retry "$EXP_ID" "$project" "$LOG_FILE"
