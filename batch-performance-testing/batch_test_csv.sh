@@ -934,6 +934,134 @@ echo ""
 echo -e "${YELLOW}Full log saved to: $LOG_FILE${NC}"
 echo ""
 
+# Wait for jobs to complete
+if [ "$SUCCESS_COUNT" -gt 0 ]; then
+    echo ""
+    echo -e "${YELLOW}=== MONITORING JOB EXECUTION ===${NC}"
+    echo ""
+    echo "Waiting for jobs to complete (checking every 10 seconds)..."
+    echo "Press Ctrl+C to stop monitoring and continue"
+    echo ""
+
+    WORKFLOW_START_TIME=$(date +%s)
+    CHECK_COUNT=0
+
+    while true; do
+        sleep 10
+        CHECK_COUNT=$((CHECK_COUNT + 1))
+        ELAPSED=$(($(date +%s) - WORKFLOW_START_TIME))
+        ELAPSED_MIN=$(awk "BEGIN {printf \"%.1f\", $ELAPSED/60}")
+
+        echo -ne "\r${YELLOW}Check $CHECK_COUNT (${ELAPSED_MIN} min elapsed) - Fetching workflow status...${NC}  "
+
+        # Fetch workflows for each project
+        ALL_WORKFLOWS="[]"
+        for project in $PROJECTS; do
+            PROJECT_WORKFLOWS=$(curl_api -X POST \
+                -b "JSESSIONID=$JSESSION" \
+                -H "Content-Type: application/json" \
+                -H "X-Requested-With: XMLHttpRequest" \
+                "${XNAT_HOST}/xapi/workflows" \
+                -d "{\"id\":\"$project\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":1}" 2>/dev/null)
+
+            if [ -n "$PROJECT_WORKFLOWS" ]; then
+                # Extract items array
+                PROJECT_ITEMS=$(echo "$PROJECT_WORKFLOWS" | jq 'if type == "array" then . else .items // .workflows // [] end' 2>/dev/null)
+                # Merge with accumulated workflows
+                ALL_WORKFLOWS=$(echo "$ALL_WORKFLOWS" "$PROJECT_ITEMS" | jq -s '.[0] + .[1]' 2>/dev/null)
+            fi
+        done
+
+        if [ "$ALL_WORKFLOWS" = "[]" ]; then
+            echo -ne "\r${YELLOW}No workflows found yet, waiting...${NC}                              "
+            continue
+        fi
+
+        # Filter workflows to only those from our batch (after BATCH_START_TIME)
+        BATCH_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq --arg container "$CONTAINER_NAME" --argjson start_time "$BATCH_START_TIME" '
+            map(select(
+                (.pipelineName // .pipeline_name // "") == $container and
+                ((.launchTime // .launch_time // 0) / 1000) >= $start_time
+            ))
+        ' 2>/dev/null)
+
+        TOTAL_WORKFLOWS=$(echo "$BATCH_WORKFLOWS" | jq 'length' 2>/dev/null)
+
+        if [ -z "$TOTAL_WORKFLOWS" ] || [ "$TOTAL_WORKFLOWS" = "0" ]; then
+            echo -ne "\r${YELLOW}No workflows found yet, waiting...${NC}                              "
+            continue
+        fi
+
+        # Count by status
+        RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started"; "i"))] | length' 2>/dev/null)
+        COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete|Success|Done"; "i"))] | length' 2>/dev/null)
+        FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Fail|Error"; "i"))] | length' 2>/dev/null)
+        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Pending|Queued"; "i"))] | length' 2>/dev/null)
+
+        # Clean up display line
+        echo -ne "\r                                                                                           \r"
+
+        echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+
+        # Check if all jobs are done (none running or pending)
+        if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -ge "$SUCCESS_COUNT" ]; then
+            echo ""
+            echo -e "${GREEN}✓ All jobs completed!${NC}"
+            echo ""
+
+            # Show final status summary
+            echo "Execution Results:"
+            echo "  Complete: ${COMPLETE:-0}"
+            echo "  Failed: ${FAILED:-0}"
+            echo ""
+
+            # Calculate total time
+            TOTAL_TIME=$((TOTAL_DURATION + ELAPSED))
+            TOTAL_TIME_MIN=$(awk "BEGIN {printf \"%.1f\", $TOTAL_TIME/60}" 2>/dev/null || echo "0.0")
+
+            echo "Execution Performance:"
+            echo "  Execution Duration: ${ELAPSED}s (${ELAPSED_MIN} min)"
+            echo "  Total Time (Submission + Execution): ${TOTAL_TIME}s (${TOTAL_TIME_MIN} min)"
+            echo ""
+
+            # Update log file with execution time
+            cat >> "$LOG_FILE" <<EOF
+
+=================================================================
+Job Execution Monitoring
+=================================================================
+Execution Time: ${ELAPSED}s (${ELAPSED_MIN} minutes)
+Final Status: ${COMPLETE:-0} Complete, ${FAILED:-0} Failed
+Total Time (Submission + Execution): ${TOTAL_TIME}s (${TOTAL_TIME_MIN} minutes)
+=================================================================
+EOF
+
+            # Store workflows for display below
+            FINAL_WORKFLOWS="$BATCH_WORKFLOWS"
+            break
+        fi
+    done
+
+    # Display final workflow details
+    if [ -n "$FINAL_WORKFLOWS" ]; then
+        echo "Workflow details (last 10):"
+        echo "$FINAL_WORKFLOWS" | jq -r 'sort_by(.launchTime // .launch_time) | reverse | .[] | "\(.status)\t\(.pipelineName // .pipeline_name // "unknown")\t\(.comments // "unknown")"' 2>/dev/null | head -10 | nl -w 3 -s '. ' | while IFS=$'\t' read -r num status wrapper exp_label; do
+            case "$status" in
+                *[Cc]omplete*|*[Ss]uccess*|*[Dd]one*)
+                    printf "${GREEN}%s${NC} %-15s %-20s %s\n" "$num" "$status" "$wrapper" "$exp_label"
+                    ;;
+                *[Ff]ail*|*[Ee]rror*)
+                    printf "${RED}%s${NC} %-15s %-20s %s\n" "$num" "$status" "$wrapper" "$exp_label"
+                    ;;
+                *)
+                    printf "%s %-15s %-20s %s\n" "$num" "$status" "$wrapper" "$exp_label"
+                    ;;
+            esac
+        done
+        echo ""
+    fi
+fi
+
 # Generate and upload HTML report if requested
 if [ -n "$REPORT_PROJECT" ]; then
     echo ""
