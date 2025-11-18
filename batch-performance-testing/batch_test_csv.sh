@@ -319,6 +319,58 @@ check_site_automation_setting() {
     fi
 }
 
+# Parse CSV header and create column index mapping
+parse_csv_header() {
+    local header="$1"
+    local IFS=','
+    local col_num=1
+
+    # Clear any existing mappings
+    unset COL_LABEL COL_SUBJECT COL_DATE COL_GENDER COL_AGE
+    unset COL_ACCESSION COL_PATIENT_ID COL_PATIENT_NAME COL_UID COL_SCANS COL_PROJECT
+
+    for col_name in $header; do
+        # Trim whitespace
+        col_name=$(echo "$col_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+        case "$col_name" in
+            Label) COL_LABEL=$col_num ;;
+            Subject) COL_SUBJECT=$col_num ;;
+            Date) COL_DATE=$col_num ;;
+            Gender) COL_GENDER=$col_num ;;
+            Age) COL_AGE=$col_num ;;
+            dcmAccessionNumber) COL_ACCESSION=$col_num ;;
+            dcmPatientId) COL_PATIENT_ID=$col_num ;;
+            dcmPatientName) COL_PATIENT_NAME=$col_num ;;
+            UID) COL_UID=$col_num ;;
+            Scans) COL_SCANS=$col_num ;;
+            Project) COL_PROJECT=$col_num ;;
+        esac
+        col_num=$((col_num + 1))
+    done
+
+    # Validate required columns exist
+    local missing_cols=""
+    [ -z "$COL_LABEL" ] && missing_cols="${missing_cols}Label "
+    [ -z "$COL_SUBJECT" ] && missing_cols="${missing_cols}Subject "
+    [ -z "$COL_DATE" ] && missing_cols="${missing_cols}Date "
+    [ -z "$COL_PROJECT" ] && missing_cols="${missing_cols}Project "
+
+    if [ -n "$missing_cols" ]; then
+        echo -e "${RED}Error: Missing required columns: $missing_cols${NC}"
+        return 1
+    fi
+
+    return 0
+}
+
+# Extract value from CSV row by column index
+get_csv_value() {
+    local row="$1"
+    local col_index="$2"
+    echo "$row" | awk -F',' -v col="$col_index" '{print $col}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 # Usage
 usage() {
     echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-s]"
@@ -331,15 +383,19 @@ usage() {
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
     echo "  -s  Skip creating sessions (assumes experiments already exist in XNAT)"
     echo ""
-    echo "CSV Format (header required):"
-    echo "  Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project"
+    echo "Required CSV columns (can be in any order, extra columns ignored):"
+    echo "  Label, Subject, Date, Project"
+    echo ""
+    echo "Optional CSV columns:"
+    echo "  Gender, Age, dcmAccessionNumber, dcmPatientId, dcmPatientName, UID, Scans"
     echo ""
     echo "Example CSV:"
-    echo '  Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project'
-    echo '  EXP001,SUBJ001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.3.4.5,3,MyProject'
-    echo '  EXP002,SUBJ002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.3.4.6,5,MyProject'
+    echo '  Project,Label,Subject,Date,ExtraColumn,Gender'
+    echo '  MyProject,EXP001,SUBJ001,2024-01-15,IgnoredValue,M'
+    echo '  MyProject,EXP002,SUBJ002,2024-01-16,AlsoIgnored,F'
     echo ""
-    echo "Note: Each row can specify a different project. The container will be enabled for each project automatically."
+    echo "Note: Columns can be in any order. Extra columns are ignored."
+    echo "      Each row can specify a different project."
     exit 1
 }
 
@@ -399,28 +455,33 @@ echo -e "${YELLOW}[2/5] Parsing CSV file...${NC}"
 # Read CSV header
 CSV_HEADER=$(head -1 "$CSV_FILE")
 echo "CSV Header: $CSV_HEADER"
+echo ""
 
-# Validate CSV header has required columns
-REQUIRED_COLS="Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project"
-if [ "$CSV_HEADER" != "$REQUIRED_COLS" ]; then
-    echo -e "${YELLOW}⚠ CSV header doesn't match expected format${NC}"
-    echo "Expected: $REQUIRED_COLS"
-    echo "Got:      $CSV_HEADER"
+# Parse header and create column mappings
+if ! parse_csv_header "$CSV_HEADER"; then
     echo ""
-    read -p "Continue anyway? (y/yes): " CONTINUE
-    if [[ ! "$CONTINUE" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-        echo "Aborted."
-        exit 0
-    fi
+    echo -e "${RED}Cannot proceed without required columns${NC}"
+    exit 1
 fi
+
+echo -e "${GREEN}✓ CSV header validated${NC}"
+echo "  Required columns found: Label (col $COL_LABEL), Subject (col $COL_SUBJECT), Date (col $COL_DATE), Project (col $COL_PROJECT)"
+[ -n "$COL_GENDER" ] && echo "  Optional: Gender (col $COL_GENDER)"
+[ -n "$COL_AGE" ] && echo "  Optional: Age (col $COL_AGE)"
+[ -n "$COL_ACCESSION" ] && echo "  Optional: dcmAccessionNumber (col $COL_ACCESSION)"
+[ -n "$COL_PATIENT_ID" ] && echo "  Optional: dcmPatientId (col $COL_PATIENT_ID)"
+[ -n "$COL_PATIENT_NAME" ] && echo "  Optional: dcmPatientName (col $COL_PATIENT_NAME)"
+[ -n "$COL_UID" ] && echo "  Optional: UID (col $COL_UID)"
+[ -n "$COL_SCANS" ] && echo "  Optional: Scans (col $COL_SCANS)"
+echo ""
 
 # Count experiments in CSV (exclude header)
 CSV_EXPERIMENT_COUNT=$(tail -n +2 "$CSV_FILE" | wc -l | tr -d ' ')
 echo -e "${GREEN}✓ Found $CSV_EXPERIMENT_COUNT experiments in CSV${NC}"
 echo ""
 
-# Extract unique projects from CSV
-PROJECTS=$(tail -n +2 "$CSV_FILE" | cut -d',' -f11 | sort -u)
+# Extract unique projects from CSV using dynamic column index
+PROJECTS=$(tail -n +2 "$CSV_FILE" | awk -F',' -v col="$COL_PROJECT" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); print $col}' | sort -u)
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -l | tr -d ' ')
 
 echo "Projects found in CSV:"
@@ -546,7 +607,13 @@ if [ "$SKIP_CREATE" = false ]; then
         ERROR_COUNT=0
 
         # Read CSV and create experiments
-        tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS=',' read -r label subject date gender age accession patient_id patient_name uid scans project; do
+        tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
+            # Extract values using dynamic column indices
+            label=$(get_csv_value "$row" "$COL_LABEL")
+            subject=$(get_csv_value "$row" "$COL_SUBJECT")
+            date=$(get_csv_value "$row" "$COL_DATE")
+            project=$(get_csv_value "$row" "$COL_PROJECT")
+
             # Build experiment ID from project and label
             EXP_ID="${project}_${label}"
 
@@ -662,8 +729,12 @@ echo ""
 
 # Submit jobs - read CSV and submit for each row
 JOB_NUMBER=0
-tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS=',' read -r label subject date gender age accession patient_id patient_name uid scans project; do
+tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
     JOB_NUMBER=$((JOB_NUMBER + 1))
+
+    # Extract values using dynamic column indices
+    label=$(get_csv_value "$row" "$COL_LABEL")
+    project=$(get_csv_value "$row" "$COL_PROJECT")
 
     # Build experiment ID
     EXP_ID="${project}_${label}"

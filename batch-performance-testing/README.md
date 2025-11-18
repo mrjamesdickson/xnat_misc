@@ -92,15 +92,15 @@ Submits container jobs based on experiment metadata from a CSV file.
 ```
 
 **CSV Format:**
-The CSV file must have the following header (case-sensitive):
-```
-Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
-```
+The CSV file requires these columns (case-sensitive, but order doesn't matter):
 
-**CSV Columns:**
+**Required columns:**
 - `Label` - Experiment label (e.g., EXP001)
 - `Subject` - Subject ID (e.g., SUBJ001)
 - `Date` - Session date (YYYY-MM-DD format)
+- `Project` - XNAT project ID
+
+**Optional columns:**
 - `Gender` - Patient gender (M/F)
 - `Age` - Patient age
 - `dcmAccessionNumber` - DICOM accession number
@@ -108,18 +108,30 @@ Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID
 - `dcmPatientName` - DICOM patient name (use ^ separator)
 - `UID` - Session UID (DICOM StudyInstanceUID)
 - `Scans` - Number of scans or comma-separated scan IDs
-- `Project` - XNAT project ID
 
-**Example CSV:**
+**Important:**
+- ✅ Columns can be in **any order**
+- ✅ **Extra columns** are ignored
+- ✅ Column names are **case-sensitive**
+
+**Example CSV (standard order):**
 ```csv
 Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
 EXP001,SUBJ001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,TestProject
 EXP002,SUBJ002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,TestProject
 ```
 
+**Example CSV (reordered columns + extras):**
+```csv
+Project,Date,Label,Subject,ExtraColumn,Gender,Age,Notes
+ProjectA,2024-01-15,EXP001,SUBJ001,IgnoredData,M,45,Patient notes
+ProjectA,2024-01-16,EXP002,SUBJ002,MoreData,F,38,Another note
+```
+
 **Example CSV Files:**
-- `example_batch.csv` - Single project example
-- `example_multi_project.csv` - Multiple projects example (demonstrates automatic per-project container enablement)
+- `example_batch.csv` - Single project, standard column order
+- `example_multi_project.csv` - Multiple projects example
+- `example_reordered.csv` - Different column order + extra columns (demonstrates flexibility)
 
 **Options:**
 - `-h` XNAT host (required)
