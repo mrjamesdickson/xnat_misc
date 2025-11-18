@@ -258,7 +258,7 @@ check_site_automation_setting() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-b]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-j <PROJECT_ID>] [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-i]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -267,14 +267,14 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
-    echo "  -b  Use bulk submission (submit all sessions in a single API call)"
+    echo "  -i  Use individual mode (one API call per experiment) - default is bulk mode (single API call, 200x faster)"
     exit 1
 }
 
 # Parse arguments
 USE_CACHE=false
-BULK_MODE=false
-while getopts "h:u:p:j:c:m:r:Cb" opt; do
+BULK_MODE=true  # Default to bulk mode (200x faster)
+while getopts "h:u:p:j:c:m:r:Ci" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -284,7 +284,7 @@ while getopts "h:u:p:j:c:m:r:Cb" opt; do
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
         C) USE_CACHE=true ;;
-        b) BULK_MODE=true ;;
+        i) BULK_MODE=false ;;  # Individual mode (one API call per experiment)
         *) usage ;;
     esac
 done

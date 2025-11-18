@@ -394,7 +394,7 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-b] [-d] [-D]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-i] [-d] [-D]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -402,7 +402,7 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
-    echo "  -b  Use bulk submission (submit all sessions in a single API call per project)"
+    echo "  -i  Use individual mode (one API call per experiment) - default is bulk mode (single API call, 200x faster)"
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
     echo ""
@@ -432,8 +432,8 @@ usage() {
 # Parse arguments
 DRY_RUN=false
 DEBUG=false
-BULK_MODE=false
-while getopts "h:u:p:f:c:m:r:bdD" opt; do
+BULK_MODE=true  # Default to bulk mode (200x faster)
+while getopts "h:u:p:f:c:m:r:idD" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -442,7 +442,7 @@ while getopts "h:u:p:f:c:m:r:bdD" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
-        b) BULK_MODE=true ;;
+        i) BULK_MODE=false ;;  # Individual mode (one API call per experiment)
         d) DRY_RUN=true ;;
         D) DEBUG=true ;;
         *) usage ;;
