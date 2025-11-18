@@ -614,9 +614,9 @@ if [ "$SKIP_CREATE" = false ]; then
             date=$(get_csv_value "$row" "$COL_DATE")
             project=$(get_csv_value "$row" "$COL_PROJECT")
 
-            # Build IDs from project and labels
-            EXP_ID="${project}_${exp_label}"
-            SUBJ_ID="${project}_${subj_label}"
+            # Build IDs in XNAT format: {Project}_E{Label} and {Project}_S{Subject}
+            EXP_ID="${project}_E${exp_label}"
+            SUBJ_ID="${project}_S${subj_label}"
 
             # Step 1: Create/verify subject exists
             SUBJ_CHECK=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/data/projects/${project}/subjects/${SUBJ_ID}?format=json" 2>/dev/null)
@@ -759,8 +759,8 @@ tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; d
     exp_label=$(get_csv_value "$row" "$COL_LABEL")
     project=$(get_csv_value "$row" "$COL_PROJECT")
 
-    # Build experiment ID from project and label (same as creation)
-    EXP_ID="${project}_${exp_label}"
+    # Build experiment ID in XNAT format: {Project}_E{Label}
+    EXP_ID="${project}_E${exp_label}"
 
     echo -e "${BLUE}Submitting job ${JOB_NUMBER}/${EXPERIMENT_COUNT}:${NC} $EXP_ID (label: $exp_label, project: $project)"
     JOB_START_TIME=$(date +%s.%N)

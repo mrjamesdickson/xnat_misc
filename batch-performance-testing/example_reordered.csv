@@ -1,5 +1,5 @@
 Project,Date,Label,Subject,ExtraColumn,Gender,Age,Notes
-ProjectA,2024-01-15,EXP001,SUBJ001,IgnoredData,M,45,Patient notes here
-ProjectA,2024-01-16,EXP002,SUBJ002,MoreIgnored,F,38,Another note
-ProjectB,2024-01-17,EXP003,SUBJ003,AlsoIgnored,M,52,Test patient
-ProjectC,2024-01-18,EXP004,SUBJ004,Unused,F,41,Data point
+XNAT01,2024-01-15,00001,00001,IgnoredData,M,45,Patient notes here
+XNAT01,2024-01-16,00002,00002,MoreIgnored,F,38,Another note
+XNAT02,2024-01-17,00001,00001,AlsoIgnored,M,52,Test patient
+XNAT03,2024-01-18,00001,00001,Unused,F,41,Data point

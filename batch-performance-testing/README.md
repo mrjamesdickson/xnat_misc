@@ -95,16 +95,28 @@ Submits container jobs based on experiment metadata from a CSV file.
 The CSV file requires these columns (case-sensitive, but order doesn't matter):
 
 **Required columns:**
-- `Label` - Experiment label (e.g., EXP001) → generates experiment ID: `{Project}_{Label}`
-- `Subject` - Subject label (e.g., SUBJ001) → generates subject ID: `{Project}_{Subject}`
+- `Label` - Experiment number/label (e.g., 00001) → generates experiment ID: `{Project}_E{Label}`
+- `Subject` - Subject number/label (e.g., 00001) → generates subject ID: `{Project}_S{Subject}`
 - `Date` - Session date (YYYY-MM-DD format)
-- `Project` - XNAT project ID
+- `Project` - XNAT project ID (e.g., XNAT01)
 
 **ID Generation:**
-The script automatically creates XNAT IDs from labels:
-- Subject ID: `{Project}_{Subject}` (e.g., `ProjectA_SUBJ001`)
-- Experiment ID: `{Project}_{Label}` (e.g., `ProjectA_EXP001`)
+The script automatically creates XNAT IDs in standard format:
+- Subject ID: `{Project}_S{Subject}` (e.g., `XNAT01_S00001`)
+- Experiment ID: `{Project}_E{Label}` (e.g., `XNAT01_E00001`)
 - Subjects are created automatically if they don't exist
+
+**Example:**
+```
+CSV Row:
+  Project: XNAT01
+  Subject: 00001
+  Label: 00001
+
+Generated:
+  Subject ID:    XNAT01_S00001
+  Experiment ID: XNAT01_E00001
+```
 
 **Optional columns:**
 - `Gender` - Patient gender (M/F)
@@ -123,16 +135,18 @@ The script automatically creates XNAT IDs from labels:
 **Example CSV (standard order):**
 ```csv
 Label,Subject,Date,Gender,Age,dcmAccessionNumber,dcmPatientId,dcmPatientName,UID,Scans,Project
-EXP001,SUBJ001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,TestProject
-EXP002,SUBJ002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,TestProject
+00001,00001,2024-01-15,M,45,ACC001,PT001,Patient^One,1.2.840.113619.2.1.1.1,3,XNAT01
+00002,00002,2024-01-16,F,38,ACC002,PT002,Patient^Two,1.2.840.113619.2.1.1.2,5,XNAT01
 ```
+This creates: XNAT01_S00001, XNAT01_E00001, XNAT01_S00002, XNAT01_E00002
 
 **Example CSV (reordered columns + extras):**
 ```csv
 Project,Date,Label,Subject,ExtraColumn,Gender,Age,Notes
-ProjectA,2024-01-15,EXP001,SUBJ001,IgnoredData,M,45,Patient notes
-ProjectA,2024-01-16,EXP002,SUBJ002,MoreData,F,38,Another note
+XNAT01,2024-01-15,00001,00001,IgnoredData,M,45,Patient notes
+XNAT02,2024-01-16,00001,00001,MoreData,F,38,Another note
 ```
+This creates: XNAT01_S00001, XNAT01_E00001, XNAT02_S00001, XNAT02_E00001
 
 **Example CSV Files:**
 - `example_batch.csv` - Single project, standard column order
@@ -167,8 +181,8 @@ ProjectA,2024-01-16,EXP002,SUBJ002,MoreData,F,38,Another note
 3. Select wrapper
 4. **Enable wrapper for ALL projects** found in CSV (automatic)
 5. Create subjects and experiments in XNAT (unless `-s` flag set):
-   - For each row: creates subject `{Project}_{Subject}` if it doesn't exist
-   - Then creates experiment `{Project}_{Label}` linked to that subject
+   - For each row: creates subject `{Project}_S{Subject}` if it doesn't exist (e.g., XNAT01_S00001)
+   - Then creates experiment `{Project}_E{Label}` linked to that subject (e.g., XNAT01_E00001)
 6. Submit container jobs (using correct project for each experiment)
 7. Report final status with performance metrics
 8. Generate and upload HTML report (if `-r` specified)
