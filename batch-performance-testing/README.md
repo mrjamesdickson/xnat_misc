@@ -95,30 +95,15 @@ Submits container jobs based on experiment metadata from a CSV file.
 The CSV file requires these columns (case-sensitive, but order doesn't matter):
 
 **Required columns:**
-- `Label` - Experiment number/label (e.g., 00001) → generates experiment ID: `{Project}_E{Label}`
 - `Subject` - Subject number/label (e.g., 00001) → generates subject ID: `{Project}_S{Subject}`
 - `Date` - Session date (YYYY-MM-DD format)
 - `Project` - XNAT project ID (e.g., XNAT01)
 
-**ID Generation:**
-The script automatically creates XNAT IDs in standard format:
-- Subject ID: `{Project}_S{Subject}` (e.g., `XNAT01_S00001`)
-- Experiment ID: `{Project}_E{Label}` (e.g., `XNAT01_E00001`)
-- Subjects are created automatically if they don't exist
-
-**Example:**
-```
-CSV Row:
-  Project: XNAT01
-  Subject: 00001
-  Label: 00001
-
-Generated:
-  Subject ID:    XNAT01_S00001
-  Experiment ID: XNAT01_E00001
-```
-
 **Optional columns:**
+- `ID` - Experiment identifier (e.g., 00001) → generates experiment ID: `{Project}_E{ID}` **(preferred)**
+- `Label` - Experiment identifier (alternative to ID, e.g., 00001) → generates experiment ID: `{Project}_E{Label}`
+  - **If neither ID nor Label provided, uses `Subject` for experiment ID**
+  - **Priority: ID > Label > Subject**
 - `Gender` - Patient gender (M/F)
 - `Age` - Patient age
 - `dcmAccessionNumber` - DICOM accession number
@@ -126,6 +111,35 @@ Generated:
 - `dcmPatientName` - DICOM patient name (use ^ separator)
 - `UID` - Session UID (DICOM StudyInstanceUID)
 - `Scans` - Number of scans or comma-separated scan IDs
+
+**ID Generation:**
+The script automatically creates XNAT IDs in standard format:
+- Subject ID: `{Project}_S{Subject}` (e.g., `XNAT01_S00001`)
+- Experiment ID: `{Project}_E{ID}` or `{Project}_E{Label}` or `{Project}_E{Subject}` (priority: ID > Label > Subject)
+- Subjects are created automatically if they don't exist
+
+**Examples:**
+
+With ID column (one subject, multiple experiments):
+```
+CSV Row:
+  Project: XNAT01, Subject: 00001, ID: 00001
+  Project: XNAT01, Subject: 00001, ID: 00002
+
+Generated:
+  Subject ID:    XNAT01_S00001
+  Experiment IDs: XNAT01_E00001, XNAT01_E00002
+```
+
+Without ID or Label column (subject = experiment):
+```
+CSV Row:
+  Project: XNAT01, Subject: 00001
+
+Generated:
+  Subject ID:    XNAT01_S00001
+  Experiment ID: XNAT01_E00001 (uses Subject)
+```
 
 **Important:**
 - ✅ Columns can be in **any order**
@@ -149,7 +163,8 @@ XNAT02,2024-01-16,00001,00001,MoreData,F,38,Another note
 This creates: XNAT01_S00001, XNAT01_E00001, XNAT02_S00001, XNAT02_E00001
 
 **Example CSV Files:**
-- `example_batch.csv` - Single project, standard column order
+- `example_minimal.csv` - Minimal format (Subject, Date, Project only)
+- `example_batch.csv` - Single project with ID/Label columns
 - `example_multi_project.csv` - Multiple projects example
 - `example_reordered.csv` - Different column order + extra columns (demonstrates flexibility)
 

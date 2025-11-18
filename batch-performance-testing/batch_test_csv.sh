@@ -326,7 +326,7 @@ parse_csv_header() {
     local col_num=1
 
     # Clear any existing mappings
-    unset COL_LABEL COL_SUBJECT COL_DATE COL_GENDER COL_AGE
+    unset COL_ID COL_LABEL COL_SUBJECT COL_DATE COL_GENDER COL_AGE
     unset COL_ACCESSION COL_PATIENT_ID COL_PATIENT_NAME COL_UID COL_SCANS COL_PROJECT
 
     for col_name in $header; do
@@ -334,6 +334,7 @@ parse_csv_header() {
         col_name=$(echo "$col_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
         case "$col_name" in
+            ID) COL_ID=$col_num ;;
             Label) COL_LABEL=$col_num ;;
             Subject) COL_SUBJECT=$col_num ;;
             Date) COL_DATE=$col_num ;;
@@ -351,7 +352,6 @@ parse_csv_header() {
 
     # Validate required columns exist
     local missing_cols=""
-    [ -z "$COL_LABEL" ] && missing_cols="${missing_cols}Label "
     [ -z "$COL_SUBJECT" ] && missing_cols="${missing_cols}Subject "
     [ -z "$COL_DATE" ] && missing_cols="${missing_cols}Date "
     [ -z "$COL_PROJECT" ] && missing_cols="${missing_cols}Project "
@@ -384,18 +384,26 @@ usage() {
     echo "  -s  Skip creating sessions (assumes experiments already exist in XNAT)"
     echo ""
     echo "Required CSV columns (can be in any order, extra columns ignored):"
-    echo "  Label, Subject, Date, Project"
+    echo "  Subject, Date, Project"
     echo ""
     echo "Optional CSV columns:"
+    echo "  ID - Experiment identifier (preferred, if not provided uses Label or Subject)"
+    echo "  Label - Experiment identifier (alternative to ID)"
     echo "  Gender, Age, dcmAccessionNumber, dcmPatientId, dcmPatientName, UID, Scans"
     echo ""
-    echo "Example CSV:"
-    echo '  Project,Label,Subject,Date,ExtraColumn,Gender'
-    echo '  MyProject,EXP001,SUBJ001,2024-01-15,IgnoredValue,M'
-    echo '  MyProject,EXP002,SUBJ002,2024-01-16,AlsoIgnored,F'
+    echo "Example CSV (minimal - Subject used for both):"
+    echo '  Subject,Date,Project'
+    echo '  00001,2024-01-15,XNAT01'
+    echo '  00002,2024-01-16,XNAT01'
+    echo ""
+    echo "Example CSV (with ID - one subject, multiple experiments):"
+    echo '  Subject,ID,Date,Project,Gender'
+    echo '  00001,00001,2024-01-15,XNAT01,M'
+    echo '  00001,00002,2024-01-16,XNAT01,F'
     echo ""
     echo "Note: Columns can be in any order. Extra columns are ignored."
     echo "      Each row can specify a different project."
+    echo "      Priority: ID > Label > Subject (for experiment identifier)."
     exit 1
 }
 
@@ -465,7 +473,12 @@ if ! parse_csv_header "$CSV_HEADER"; then
 fi
 
 echo -e "${GREEN}✓ CSV header validated${NC}"
-echo "  Required columns found: Label (col $COL_LABEL), Subject (col $COL_SUBJECT), Date (col $COL_DATE), Project (col $COL_PROJECT)"
+echo "  Required columns found: Subject (col $COL_SUBJECT), Date (col $COL_DATE), Project (col $COL_PROJECT)"
+[ -n "$COL_ID" ] && echo "  Optional: ID (col $COL_ID) - experiment identifier (preferred)"
+[ -n "$COL_LABEL" ] && echo "  Optional: Label (col $COL_LABEL) - experiment identifier"
+if [ -z "$COL_ID" ] && [ -z "$COL_LABEL" ]; then
+    echo "  Note: No ID/Label column found, will use Subject for experiment ID"
+fi
 [ -n "$COL_GENDER" ] && echo "  Optional: Gender (col $COL_GENDER)"
 [ -n "$COL_AGE" ] && echo "  Optional: Age (col $COL_AGE)"
 [ -n "$COL_ACCESSION" ] && echo "  Optional: dcmAccessionNumber (col $COL_ACCESSION)"
@@ -609,10 +622,18 @@ if [ "$SKIP_CREATE" = false ]; then
         # Read CSV and create experiments
         tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; do
             # Extract values using dynamic column indices
-            exp_label=$(get_csv_value "$row" "$COL_LABEL")
             subj_label=$(get_csv_value "$row" "$COL_SUBJECT")
             date=$(get_csv_value "$row" "$COL_DATE")
             project=$(get_csv_value "$row" "$COL_PROJECT")
+
+            # Use ID first, then Label, then Subject for experiment identifier
+            if [ -n "$COL_ID" ]; then
+                exp_label=$(get_csv_value "$row" "$COL_ID")
+            elif [ -n "$COL_LABEL" ]; then
+                exp_label=$(get_csv_value "$row" "$COL_LABEL")
+            else
+                exp_label="$subj_label"
+            fi
 
             # Build IDs in XNAT format: {Project}_E{Label} and {Project}_S{Subject}
             EXP_ID="${project}_E${exp_label}"
@@ -756,8 +777,17 @@ tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | while IFS= read -r row; d
     JOB_NUMBER=$((JOB_NUMBER + 1))
 
     # Extract values using dynamic column indices
-    exp_label=$(get_csv_value "$row" "$COL_LABEL")
+    subj_label=$(get_csv_value "$row" "$COL_SUBJECT")
     project=$(get_csv_value "$row" "$COL_PROJECT")
+
+    # Use ID first, then Label, then Subject for experiment identifier
+    if [ -n "$COL_ID" ]; then
+        exp_label=$(get_csv_value "$row" "$COL_ID")
+    elif [ -n "$COL_LABEL" ]; then
+        exp_label=$(get_csv_value "$row" "$COL_LABEL")
+    else
+        exp_label="$subj_label"
+    fi
 
     # Build experiment ID in XNAT format: {Project}_E{Label}
     EXP_ID="${project}_E${exp_label}"
