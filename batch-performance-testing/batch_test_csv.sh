@@ -503,13 +503,17 @@ echo -e "${YELLOW}=== PROJECT CONFIRMATION ===${NC}"
 echo "The script will work with the following project(s):"
 echo ""
 
-# Show experiment count per project
+# Show experiment count per project (only from selected experiments)
 echo "$PROJECTS" | while read -r proj; do
-    COUNT=$(tail -n +2 "$CSV_FILE" | awk -F',' -v col="$COL_PROJECT" -v project="$proj" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); if ($col == project) count++} END {print count+0}')
+    COUNT=$(tail -n +2 "$CSV_FILE" | head -n "$EXPERIMENT_COUNT" | awk -F',' -v col="$COL_PROJECT" -v project="$proj" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); if ($col == project) count++} END {print count+0}')
     printf "  %-15s (%d experiments)\n" "$proj" "$COUNT"
 done
 echo ""
-echo "Total: $CSV_EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s)"
+if [ "$EXPERIMENT_COUNT" -lt "$CSV_EXPERIMENT_COUNT" ]; then
+    echo "Total: $EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s) (limited from $CSV_EXPERIMENT_COUNT total in CSV)"
+else
+    echo "Total: $EXPERIMENT_COUNT experiments across $PROJECT_COUNT project(s)"
+fi
 echo ""
 
 read -p "Continue with these projects? (y/yes): " PROJECT_CONFIRM
@@ -585,7 +589,8 @@ fi
 echo -e "${GREEN}✓ Container: $CONTAINER_NAME (ID: $WRAPPER_ID)${NC}"
 echo ""
 
-# Step 4: Enable wrapper for all projects in CSV
+# Step 4: Enable wrapper for all projects (only from selected experiments)
+# Note: $PROJECTS was already filtered to only include projects from first $EXPERIMENT_COUNT rows
 if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}[4/5] DRY RUN: Would enable wrapper for projects...${NC}"
     echo ""
