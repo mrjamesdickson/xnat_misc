@@ -102,17 +102,83 @@ ID,Project
 Tested successfully on `http://localhost` XNAT:
 - CSV parsing: ✅
 - Individual submission: ✅ (HTTP 200)
+- Bulk submission: ✅ (HTTP 200, 0.047s for 3 experiments)
 - Workflow monitoring: ✅
 - Debug output: ✅
 - Project-based wrapper enabling: ✅
+- macOS BSD compatibility: ✅
+
+### Bulk Submission Payload Format
+Key discovery: The `session` field must be a STRING containing JSON array, not array directly.
+
+**Correct format:**
+```json
+{
+  "session": "[\"/archive/experiments/XNAT_E02227\",\"/archive/experiments/XNAT_E02214\"]"
+}
+```
+
+**Endpoint:** `POST /xapi/projects/{project}/wrappers/{id}/root/session/bulklaunch`
+
+See `BULK_PAYLOAD_EXAMPLES.md` for detailed examples and performance comparisons.
+
+## Real-World Test Data Ready
+
+Downloaded CSV from demo02: `admin_11_18_2025_19_15_12.csv`
+- **Total experiments:** 1,289
+- **Projects:** 12 unique projects
+- **Largest project:** MedNIST with 701 experiments
+- **Performance estimate:**
+  - Individual mode: ~129 seconds (0.1s per call × 1,289)
+  - Bulk mode: ~6 seconds (0.5s per call × 12 projects)
+  - **Expected speedup:** ~21x faster
+
+## Batch-Launch Plugin Deployment
+
+**Status:** Deployed to localhost XNAT (`http://localhost`)
+- **Plugin:** batch-launch-0.8.1-xpl.jar (144KB)
+- **Location:** `/Users/james/projects/xnat_docker_testing/xnat/plugins/`
+- **XNAT container:** `xnat-web` (restarted successfully)
+- **Startup time:** 61 seconds
+- **Verification:** Pending - need to check plugin loaded via API
+
+**Deployment commands used:**
+```bash
+cd /Users/james/projects/xnat_docker_testing
+curl -L -o xnat/plugins/batch-launch-0.8.1-xpl.jar \
+  "https://bitbucket.org/xnatdev/batch-launch-plugin/downloads/batch-launch-0.8.1-xpl.jar"
+docker-compose restart xnat-web
+```
 
 ## Repository
 
 Location: `xnat_misc/batch-performance-testing/`
 GitHub: https://github.com/mrjamesdickson/xnat_misc
 Branch: `main`
-Latest commit: `27023d6 Add bulk submission mode (-b flag) to batch_test_csv.sh`
+Latest commit: `1e11cbc Add comprehensive batch launch quick reference guide`
 
-## Next Steps / Future Enhancements
+All changes committed and pushed.
 
-- None pending - all requested features implemented
+## Current State (End of Session)
+
+**Completed:**
+1. ✅ Pure container launcher (no experiment creation)
+2. ✅ Mandatory workflow monitoring (waits for completion)
+3. ✅ Bulk submission mode (-b flag)
+4. ✅ Debug mode (-D flag) with detailed API output
+5. ✅ Optimized -m flag (only reads first N rows)
+6. ✅ macOS BSD compatibility throughout
+7. ✅ Comprehensive documentation (BATCH_LAUNCH_GUIDE.md, BULK_PAYLOAD_EXAMPLES.md)
+8. ✅ Test scripts created (test_bulk_submission.sh, show_bulk_payload.sh)
+9. ✅ Batch-launch plugin deployed to localhost
+
+**Ready to test:**
+- Real CSV with 1,289 experiments across 12 projects
+- Bulk mode expected to be ~21x faster than individual mode
+- Plugin verification and testing on localhost XNAT
+
+**Next steps if continuing:**
+1. Verify batch-launch plugin loaded: `curl -u admin:admin http://localhost/xapi/plugins | jq`
+2. Test bulk submission with real CSV data
+3. Compare performance: bulk vs individual mode
+4. Document actual performance results
