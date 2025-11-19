@@ -83,10 +83,29 @@ echo -e "${GREEN}✓ Found $PROJECT_COUNT project(s)${NC}"
 echo ""
 
 # Fetch workflows from all projects
-echo -e "${YELLOW}Fetching workflows...${NC}"
+echo -e "${YELLOW}Fetching workflows from $PROJECT_COUNT projects...${NC}"
 ALL_WORKFLOWS="[]"
+CURRENT=0
 
 for project in $PROJECTS; do
+    CURRENT=$((CURRENT + 1))
+
+    # Calculate progress bar
+    PERCENT=$((CURRENT * 100 / PROJECT_COUNT))
+    BAR_WIDTH=30
+    FILLED=$((PERCENT * BAR_WIDTH / 100))
+    EMPTY=$((BAR_WIDTH - FILLED))
+
+    # Build progress bar
+    BAR="["
+    for ((i=0; i<FILLED; i++)); do BAR+="="; done
+    if [ $FILLED -lt $BAR_WIDTH ]; then BAR+=">"; fi
+    for ((i=0; i<EMPTY-1; i++)); do BAR+=" "; done
+    BAR+="]"
+
+    # Display progress
+    printf "\r${CYAN}%s${NC} %3d%% (%d/%d) %s" "$BAR" "$PERCENT" "$CURRENT" "$PROJECT_COUNT" "$project"
+
     PROJECT_WORKFLOWS=$(curl -s -X POST \
         -b "JSESSIONID=$JSESSION" \
         -H "Content-Type: application/json" \
@@ -99,6 +118,9 @@ for project in $PROJECTS; do
         ALL_WORKFLOWS=$(echo "$ALL_WORKFLOWS" "$PROJECT_ITEMS" | jq -s '.[0] + .[1]' 2>/dev/null || echo "$ALL_WORKFLOWS")
     fi
 done
+
+# Clear progress line and show completion
+echo ""
 
 TOTAL_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq 'length' 2>/dev/null || echo "0")
 
