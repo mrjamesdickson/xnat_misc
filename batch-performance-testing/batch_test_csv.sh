@@ -1114,10 +1114,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress"; "i"))] | length' 2>/dev/null)
         COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete"; "i"))] | length' 2>/dev/null)
         FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Failed|Killed"; "i"))] | length' 2>/dev/null)
-        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing"; "i"))] | length' 2>/dev/null)
+        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing|Created"; "i"))] | length' 2>/dev/null)
 
         # Count workflows with unknown status (don't match any known pattern)
-        UNKNOWN=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing"; "i") | not)] | length' 2>/dev/null)
+        UNKNOWN=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created"; "i") | not)] | length' 2>/dev/null)
 
         # Clean up display line
         echo -ne "\r                                                                                           \r"
@@ -1125,7 +1125,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         if [ "${UNKNOWN:-0}" -gt 0 ]; then
             echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, UNKNOWN: ${UNKNOWN}"
             echo -e "${RED}WARNING: ${UNKNOWN} workflows have unknown status!${NC}"
-            echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
+            echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
         else
             echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
         fi
@@ -1134,8 +1134,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         if [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
             CURRENT_TIME=$(date +%s)
             echo "$BATCH_WORKFLOWS" | jq -c --argjson check_time "$CURRENT_TIME" '.[] | {
-                workflowId: (.workflowId // .workflow_id),
-                externalId: (.externalId // .external_id),
+                workflowId: (.wfid // .workflowId // .workflow_id),
+                experimentId: (.id // .experimentId // "unknown"),
+                projectId: (.externalId // .external_id // "unknown"),
+                label: (.label // "unknown"),
                 status: .status,
                 launchTime: ((.launchTime // .launch_time // 0) / 1000),
                 checkTime: $check_time,
@@ -1177,7 +1179,8 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         fi
 
         # Check if all jobs are done (none running, pending, or unknown)
-        if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "${UNKNOWN:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -ge "$SUCCESS_COUNT" ]; then
+        # Note: Don't check TOTAL_WORKFLOWS >= SUCCESS_COUNT because some experiments may not exist in XNAT
+        if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "${UNKNOWN:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
             echo ""
             echo -e "${GREEN}✓ All jobs completed!${NC}"
             echo ""
@@ -1267,7 +1270,7 @@ for wf_id, states in workflows.items():
     # Sort by check time
     states.sort(key=lambda x: x['checkTime'])
 
-    experiment_id = states[0]['externalId']
+    experiment_id = states[0].get('experimentId', states[0].get('label', 'N/A'))
     launch_time = states[0]['launchTime']
     first_seen = states[0]['checkTime']
     last_update = states[-1]['checkTime']
