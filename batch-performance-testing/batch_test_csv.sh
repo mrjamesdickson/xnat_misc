@@ -23,6 +23,9 @@ JOB_SUBMIT_MAX_TIME=${JOB_SUBMIT_MAX_TIME:-600}
 JOB_SUBMIT_RETRY_ATTEMPTS=${JOB_SUBMIT_RETRY_ATTEMPTS:-3}
 JOB_SUBMIT_RETRY_DELAY=${JOB_SUBMIT_RETRY_DELAY:-10}
 
+# Workflow monitoring configuration
+CHECK_INTERVAL=${CHECK_INTERVAL:-10}  # Seconds between status checks
+
 AUTOMATION_ENABLED_VALUE="unknown"
 AUTOMATION_CHECK_NOTE="Not checked"
 SITE_CONFIG_ENDPOINT="/xapi/siteConfig/automation.enabled"
@@ -394,7 +397,7 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-i] [-d] [-D] [-v]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-i] [-d] [-D] [-v]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -402,6 +405,7 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
+    echo "  -t  Workflow check interval in seconds (optional - defaults to 10)"
     echo "  -i  Use individual mode (one API call per experiment) - default is bulk mode (single API call, 200x faster)"
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
@@ -435,7 +439,7 @@ DRY_RUN=false
 DEBUG=false
 VERBOSE=false
 BULK_MODE=true  # Default to bulk mode (200x faster)
-while getopts "h:u:p:f:c:m:r:idDv" opt; do
+while getopts "h:u:p:f:c:m:r:t:idDv" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -444,6 +448,7 @@ while getopts "h:u:p:f:c:m:r:idDv" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
+        t) CHECK_INTERVAL="$OPTARG" ;;
         i) BULK_MODE=false ;;  # Individual mode (one API call per experiment)
         d) DRY_RUN=true ;;
         D) DEBUG=true ;;
@@ -1050,7 +1055,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     > "$WORKFLOW_TRACKING_FILE"  # Clear file
 
     while true; do
-        sleep 10
+        sleep $CHECK_INTERVAL
         CHECK_COUNT=$((CHECK_COUNT + 1))
         ELAPSED=$(($(date +%s) - WORKFLOW_START_TIME))
         ELAPSED_MIN=$(awk "BEGIN {printf \"%.1f\", $ELAPSED/60}")
