@@ -1057,6 +1057,9 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         echo -ne "\r${YELLOW}Check $CHECK_COUNT (${ELAPSED_MIN} min elapsed) - Fetching workflow status...${NC}  "
 
+        # Measure query performance
+        QUERY_START_TIME=$(date +%s.%N)
+
         # Fetch workflows for each project
         ALL_WORKFLOWS="[]"
         for project in $PROJECTS; do
@@ -1110,24 +1113,28 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             continue
         fi
 
+        # Measure query performance
+        QUERY_END_TIME=$(date +%s.%N)
+        QUERY_DURATION=$(echo "$QUERY_END_TIME - $QUERY_START_TIME" | bc)
+
         # Count by status (matches any status containing these keywords)
         RUNNING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress"; "i"))] | length' 2>/dev/null)
         COMPLETE=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Complete"; "i"))] | length' 2>/dev/null)
         FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Failed|Killed"; "i"))] | length' 2>/dev/null)
-        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing|Created"; "i"))] | length' 2>/dev/null)
+        PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing|Created|Staging"; "i"))] | length' 2>/dev/null)
 
         # Count workflows with unknown status (don't match any known pattern)
-        UNKNOWN=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created"; "i") | not)] | length' 2>/dev/null)
+        UNKNOWN=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created|Staging"; "i") | not)] | length' 2>/dev/null)
 
         # Clean up display line
         echo -ne "\r                                                                                           \r"
 
         if [ "${UNKNOWN:-0}" -gt 0 ]; then
-            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, UNKNOWN: ${UNKNOWN}"
+            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min, query: ${QUERY_DURATION}s): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, UNKNOWN: ${UNKNOWN}"
             echo -e "${RED}WARNING: ${UNKNOWN} workflows have unknown status!${NC}"
-            echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
+            echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing|Created|Staging"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
         else
-            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min, query: ${QUERY_DURATION}s): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
         fi
 
         # Track individual workflow state transitions
