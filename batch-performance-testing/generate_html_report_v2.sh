@@ -527,33 +527,37 @@ if [ -n "$REPORT_PROJECT" ] && [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n
         # Create resource if needed
         RESOURCE_URL="${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS"
 
-        # Upload files using original names so HTML can find them
-        # Note: Filenames already contain timestamp from log generation
+        # Generate date-based folder structure: YYYY-MM-DD/HHMMSS/
+        DATE_FOLDER=$(date '+%Y-%m-%d')
+        RUN_TIME=$(date '+%H%M%S')
+        RUN_FOLDER="${DATE_FOLDER}/${RUN_TIME}"
+
+        echo -e "${BLUE}Organizing files in: ${RUN_FOLDER}/${NC}"
 
         UPLOAD_FAILED=false
 
         # Upload HTML
-        if ! upload_file "$HTML_FILE" "text/html" "${RESOURCE_URL}/files/$(basename "$HTML_FILE")" "BATCH_TEST_REPORT"; then
+        if ! upload_file "$HTML_FILE" "text/html" "${RESOURCE_URL}/files/${RUN_FOLDER}/$(basename "$HTML_FILE")" "BATCH_TEST_REPORT"; then
             UPLOAD_FAILED=true
         fi
 
         # Upload JSON metadata
         if [ "$UPLOAD_FAILED" = false ]; then
-            if ! upload_file "$METADATA_JSON" "application/json" "${RESOURCE_URL}/files/$(basename "$METADATA_JSON")" "BATCH_TEST_DATA"; then
+            if ! upload_file "$METADATA_JSON" "application/json" "${RESOURCE_URL}/files/${RUN_FOLDER}/$(basename "$METADATA_JSON")" "BATCH_TEST_DATA"; then
                 UPLOAD_FAILED=true
             fi
         fi
 
         # Upload workflow CSV
         if [ "$UPLOAD_FAILED" = false ] && [ -f "$WORKFLOW_CSV" ]; then
-            if ! upload_file "$WORKFLOW_CSV" "text/csv" "${RESOURCE_URL}/files/$(basename "$WORKFLOW_CSV")" "BATCH_TEST_METRICS"; then
+            if ! upload_file "$WORKFLOW_CSV" "text/csv" "${RESOURCE_URL}/files/${RUN_FOLDER}/$(basename "$WORKFLOW_CSV")" "BATCH_TEST_METRICS"; then
                 UPLOAD_FAILED=true
             fi
         fi
 
         # Upload original log file for reference
         if [ "$UPLOAD_FAILED" = false ] && [ -f "$LOG_FILE" ]; then
-            if ! upload_file "$LOG_FILE" "text/plain" "${RESOURCE_URL}/files/$(basename "$LOG_FILE")" "BATCH_TEST_LOG"; then
+            if ! upload_file "$LOG_FILE" "text/plain" "${RESOURCE_URL}/files/${RUN_FOLDER}/$(basename "$LOG_FILE")" "BATCH_TEST_LOG"; then
                 UPLOAD_FAILED=true
             fi
         fi
