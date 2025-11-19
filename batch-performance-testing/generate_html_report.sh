@@ -637,6 +637,54 @@ cat > "$OUTPUT_FILE" <<EOF
             background: #f8f9fa;
         }
 
+        .sortable-table th {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        .sortable-table th:hover {
+            background: #d5dce0;
+        }
+
+        .sortable-table th.sort-asc::after {
+            content: ' ▲';
+            font-size: 0.8em;
+            color: #3498db;
+        }
+
+        .sortable-table th.sort-desc::after {
+            content: ' ▼';
+            font-size: 0.8em;
+            color: #3498db;
+        }
+
+        .workflow-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .workflow-stat {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .workflow-stat .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .workflow-stat .value {
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
         .trend-up {
             color: #e74c3c;
         }
@@ -1017,6 +1065,185 @@ cat >> "$OUTPUT_FILE" <<EOF
                 </div>
             </div>
         </div>
+EOF
+
+# Check for per-workflow metrics CSV
+WORKFLOW_METRICS_CSV="${LOG_FILE%.log}_workflow_metrics.csv"
+if [ -f "$WORKFLOW_METRICS_CSV" ]; then
+    echo "   Found workflow metrics: $WORKFLOW_METRICS_CSV"
+
+    # Calculate summary statistics using awk
+    WORKFLOW_STATS=$(tail -n +2 "$WORKFLOW_METRICS_CSV" | awk -F',' '
+    BEGIN {
+        count = 0
+        total_queued = 0
+        total_running = 0
+        total_total = 0
+        min_queued = 999999
+        max_queued = 0
+        min_running = 999999
+        max_running = 0
+        complete = 0
+        failed = 0
+    }
+    {
+        count++
+        queued = $7
+        running = $8
+        total = $9
+        status = $3
+
+        total_queued += queued
+        total_running += running
+        total_total += total
+
+        if (queued < min_queued) min_queued = queued
+        if (queued > max_queued) max_queued = queued
+        if (running < min_running) min_running = running
+        if (running > max_running) max_running = running
+
+        if (tolower(status) ~ /complete/) complete++
+        else if (tolower(status) ~ /fail/) failed++
+    }
+    END {
+        if (count > 0) {
+            printf "%d|%.1f|%.1f|%.1f|%.1f|%.1f|%.1f|%.1f|%d|%d",
+                count,
+                total_queued/count,
+                min_queued,
+                max_queued,
+                total_running/count,
+                min_running,
+                max_running,
+                total_total/count,
+                complete,
+                failed
+        }
+    }
+    ')
+
+    if [ -n "$WORKFLOW_STATS" ]; then
+        WF_COUNT=$(echo "$WORKFLOW_STATS" | cut -d'|' -f1)
+        WF_AVG_QUEUE=$(echo "$WORKFLOW_STATS" | cut -d'|' -f2)
+        WF_MIN_QUEUE=$(echo "$WORKFLOW_STATS" | cut -d'|' -f3)
+        WF_MAX_QUEUE=$(echo "$WORKFLOW_STATS" | cut -d'|' -f4)
+        WF_AVG_RUN=$(echo "$WORKFLOW_STATS" | cut -d'|' -f5)
+        WF_MIN_RUN=$(echo "$WORKFLOW_STATS" | cut -d'|' -f6)
+        WF_MAX_RUN=$(echo "$WORKFLOW_STATS" | cut -d'|' -f7)
+        WF_AVG_TOTAL=$(echo "$WORKFLOW_STATS" | cut -d'|' -f8)
+        WF_COMPLETE=$(echo "$WORKFLOW_STATS" | cut -d'|' -f9)
+        WF_FAILED=$(echo "$WORKFLOW_STATS" | cut -d'|' -f10)
+
+        cat >> "$OUTPUT_FILE" <<'WFEOF'
+
+        <div class="section">
+            <h2 class="section-title">⏱️ Per-Workflow Metrics</h2>
+            <p class="subtitle">Individual workflow timing breakdown (queue time, execution time, total duration)</p>
+
+            <div class="workflow-summary">
+WFEOF
+
+        cat >> "$OUTPUT_FILE" <<WFEOF
+                <div class="workflow-stat">
+                    <div class="label">Workflows Tracked</div>
+                    <div class="value">$WF_COUNT</div>
+                </div>
+                <div class="workflow-stat">
+                    <div class="label">Avg Queue Time</div>
+                    <div class="value">${WF_AVG_QUEUE}s</div>
+                </div>
+                <div class="workflow-stat">
+                    <div class="label">Avg Run Time</div>
+                    <div class="value">${WF_AVG_RUN}s</div>
+                </div>
+                <div class="workflow-stat">
+                    <div class="label">Avg Total Time</div>
+                    <div class="value">${WF_AVG_TOTAL}s</div>
+                </div>
+WFEOF
+
+        cat >> "$OUTPUT_FILE" <<'WFEOF'
+            </div>
+
+            <h3 style="margin-top: 20px; color: #2c3e50;">Workflow Details</h3>
+            <p style="font-size: 0.9em; color: #7f8c8d; margin-bottom: 10px;">Click column headers to sort. Showing all workflows from this test run.</p>
+
+            <table class="chart-data-table sortable-table" id="workflowTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Workflow ID</th>
+                        <th onclick="sortTable(1)">Experiment ID</th>
+                        <th onclick="sortTable(2)">Status</th>
+                        <th onclick="sortTable(3)">Queue Time (s)</th>
+                        <th onclick="sortTable(4)">Run Time (s)</th>
+                        <th onclick="sortTable(5)">Total Time (s)</th>
+                    </tr>
+                </thead>
+                <tbody>
+WFEOF
+
+        # Add workflow data rows (skip header, limit to first 100 for performance)
+        tail -n +2 "$WORKFLOW_METRICS_CSV" | head -100 | while IFS=',' read -r wf_id exp_id status launch first last queued running total; do
+            cat >> "$OUTPUT_FILE" <<WFEOF
+                    <tr>
+                        <td>$wf_id</td>
+                        <td>$exp_id</td>
+                        <td>$status</td>
+                        <td>$queued</td>
+                        <td>$running</td>
+                        <td>$total</td>
+                    </tr>
+WFEOF
+        done
+
+        cat >> "$OUTPUT_FILE" <<'WFEOF'
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+        // Table sorting functionality
+        function sortTable(columnIndex) {
+            const table = document.getElementById('workflowTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const header = table.querySelectorAll('th')[columnIndex];
+            const isNumeric = columnIndex >= 3; // Columns 3+ are numeric
+
+            // Determine sort direction
+            const currentSort = header.className;
+            const isAscending = currentSort !== 'sort-asc';
+
+            // Clear all sort indicators
+            table.querySelectorAll('th').forEach(th => th.className = '');
+
+            // Set new sort indicator
+            header.className = isAscending ? 'sort-asc' : 'sort-desc';
+
+            // Sort rows
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+
+                let comparison = 0;
+                if (isNumeric) {
+                    comparison = parseFloat(aValue) - parseFloat(bValue);
+                } else {
+                    comparison = aValue.localeCompare(bValue);
+                }
+
+                return isAscending ? comparison : -comparison;
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        </script>
+WFEOF
+    fi
+fi
+
+cat >> "$OUTPUT_FILE" <<EOF
 
         <div class="section">
             <h2 class="section-title">Detailed Job Log</h2>
