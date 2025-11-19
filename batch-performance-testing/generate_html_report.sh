@@ -1244,8 +1244,8 @@ WFEOF
     fi
 fi
 
-# Extract query performance data from log
-QUERY_PERF_DATA=$(grep -oP 'Check \K\d+.*query: \K[\d.]+' "$LOG_FILE" 2>/dev/null || echo "")
+# Extract query performance data from log (BSD-compatible)
+QUERY_PERF_DATA=$(grep -oE 'query: [0-9.]+s' "$LOG_FILE" 2>/dev/null | sed 's/query: //; s/s$//' | tr '\n' ',' | sed 's/,$//' || echo "")
 
 # Extract workflow timing data if CSV exists
 if [ -f "$WORKFLOW_METRICS_CSV" ]; then
