@@ -1351,7 +1351,17 @@ if [ -n "$REPORT_PROJECT" ]; then
     echo -e "${YELLOW}=== GENERATING HTML REPORT ===${NC}"
     echo ""
 
-    if [ -f "./generate_html_report.sh" ]; then
+    # Use v2 report generator (data-driven with external files)
+    if [ -f "./generate_html_report_v2.sh" ]; then
+        ./generate_html_report_v2.sh \
+            -l "$LOG_FILE" \
+            -h "$XNAT_HOST" \
+            -u "$USERNAME" \
+            -p "$PASSWORD" \
+            -r "$REPORT_PROJECT"
+    elif [ -f "./generate_html_report.sh" ]; then
+        # Fallback to v1 (embedded data)
+        echo -e "${YELLOW}Using legacy report generator (v1)${NC}"
         ./generate_html_report.sh \
             -l "$LOG_FILE" \
             -h "$XNAT_HOST" \
