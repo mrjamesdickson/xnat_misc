@@ -14,6 +14,41 @@ Tools for testing XNAT container batch submission performance and monitoring wor
 ./batch_test.sh -h https://xnat.example.com -u admin -p password -r REPORTS
 ```
 
+## Development
+
+### Testing Requirements (CRITICAL)
+
+**ALL code changes MUST pass tests before pushing:**
+
+1. **Run the test suite after EVERY code change:**
+   ```bash
+   ./test_report_generation.sh
+   ```
+
+2. **ALL tests must pass (100%)** before committing/pushing code
+3. **NEVER push code with failing tests**
+4. **NEVER remove or skip tests to make them pass** - fix the code or fix the tests
+
+The test suite validates:
+- File generation (HTML, JSON, CSV, logs)
+- JSON structure and validity
+- CSV format and data integrity
+- HTML structure and data loading
+- Data consistency across all files
+
+**Before every commit:**
+```bash
+# 1. Make your changes
+# 2. Run tests
+./test_report_generation.sh
+
+# 3. Verify all tests pass
+# 4. Only then commit and push
+git add .
+git commit -m "Your changes"
+git push
+```
+
 ## Scripts
 
 ### `batch_test.sh` - Batch Container Submission ✅

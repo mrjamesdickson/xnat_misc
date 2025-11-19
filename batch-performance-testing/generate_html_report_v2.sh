@@ -74,12 +74,12 @@ HOST=$(grep "^Host:" "$LOG_FILE" | head -1 | sed 's/Host: //' || echo "N/A")
 USER=$(grep "^User:" "$LOG_FILE" | head -1 | sed 's/User: //' || echo "N/A")
 CSV_FILE=$(grep "^CSV File:" "$LOG_FILE" | head -1 | sed 's/CSV File: //' || echo "N/A")
 CONTAINER=$(grep "^Container:" "$LOG_FILE" | head -1 | sed 's/Container: //' || echo "N/A")
-JOBS_SUBMITTED=$(grep "Jobs Submitted:" "$LOG_FILE" | sed -E 's/.*Jobs Submitted: ([0-9]+).*/\1/' || echo "0")
-SUCCESS_COUNT=$(grep "Successful:" "$LOG_FILE" | sed -E 's/.*Successful: ([0-9]+).*/\1/' || echo "0")
-FAIL_COUNT=$(grep "Failed:" "$LOG_FILE" | sed -E 's/.*Failed: ([0-9]+).*/\1/' || echo "0")
+JOBS_SUBMITTED=$(grep "Jobs Submitted:" "$LOG_FILE" | head -1 | sed -E 's/.*Jobs Submitted: ([0-9]+).*/\1/' || echo "0")
+SUCCESS_COUNT=$(grep "Successful:" "$LOG_FILE" | head -1 | sed -E 's/.*Successful: ([0-9]+).*/\1/' || echo "0")
+FAIL_COUNT=$(grep "Failed:" "$LOG_FILE" | head -1 | sed -E 's/.*Failed: ([0-9]+).*/\1/' || echo "0")
 SUBMISSION_DURATION=$(grep "Total Duration:" "$LOG_FILE" | head -1 | sed -E 's/.*Total Duration: ([^ ]+).*/\1/' || echo "0s")
 EXECUTION_DURATION=$(grep "Execution Time:" "$LOG_FILE" | head -1 | sed -E 's/.*Execution Time: ([^ ]+).*/\1/' || echo "0s")
-THROUGHPUT=$(grep "Throughput:" "$LOG_FILE" | sed -E 's/.*Throughput: ([0-9.]+).*/\1/' || echo "0.00")
+THROUGHPUT=$(grep "Throughput:" "$LOG_FILE" | head -1 | sed -E 's/.*Throughput: ([0-9.]+).*/\1/' || echo "0.00")
 
 # Extract query performance data (BSD-compatible)
 QUERY_TIMES=$(grep -oE 'query: [0-9.]+s' "$LOG_FILE" 2>/dev/null | sed 's/query: //; s/s$//' || echo "")
@@ -118,6 +118,11 @@ EOF
 if [ -n "$QUERY_TIMES" ]; then
     FIRST=true
     for time in $QUERY_TIMES; do
+        # Add leading zero if number starts with decimal point
+        if [[ "$time" == .* ]]; then
+            time="0$time"
+        fi
+
         if [ "$FIRST" = true ]; then
             echo "    $time" >> "$METADATA_JSON"
             FIRST=false
