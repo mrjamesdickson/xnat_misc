@@ -444,8 +444,22 @@ cat > "$HTML_FILE" <<'HTMLEOF'
         function renderWorkflowChart(workflows) {
             const ctx = document.getElementById('workflowTimingChart').getContext('2d');
             const labels = workflows.map((w, i) => `WF ${i + 1}`);
-            const queuedTimes = workflows.map(w => parseFloat(w.QueuedDuration || 0));
-            const runningTimes = workflows.map(w => parseFloat(w.RunningDuration || 0));
+
+            // Use TotalDuration as fallback for workflows that completed too fast to observe states
+            const queuedTimes = workflows.map(w => {
+                const queued = parseFloat(w.QueuedDuration || 0);
+                const running = parseFloat(w.RunningDuration || 0);
+                const total = parseFloat(w.TotalDuration || 0);
+                // If no state breakdown but has total time, show total as "queued" (orange)
+                return (queued === 0 && running === 0 && total > 0) ? total : queued;
+            });
+            const runningTimes = workflows.map(w => {
+                const queued = parseFloat(w.QueuedDuration || 0);
+                const running = parseFloat(w.RunningDuration || 0);
+                const total = parseFloat(w.TotalDuration || 0);
+                // Only show running time if we have state breakdown
+                return (queued === 0 && running === 0 && total > 0) ? 0 : running;
+            });
 
             new Chart(ctx, {
                 type: 'bar',
