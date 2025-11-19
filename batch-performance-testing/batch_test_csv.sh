@@ -26,6 +26,36 @@ JOB_SUBMIT_RETRY_DELAY=${JOB_SUBMIT_RETRY_DELAY:-10}
 # Workflow monitoring configuration
 CHECK_INTERVAL=${CHECK_INTERVAL:-10}  # Seconds between status checks
 
+# Parse time strings like 30s, 10m, 1h into seconds
+parse_time() {
+    local time_str="$1"
+    local value="${time_str%[a-z]*}"
+    local unit="${time_str#"$value"}"
+
+    # If no unit, assume seconds
+    if [ -z "$unit" ]; then
+        echo "$value"
+        return 0
+    fi
+
+    case "$unit" in
+        s|sec|secs|second|seconds)
+            echo "$value"
+            ;;
+        m|min|mins|minute|minutes)
+            echo $((value * 60))
+            ;;
+        h|hr|hrs|hour|hours)
+            echo $((value * 3600))
+            ;;
+        *)
+            echo "Invalid time unit: $unit" >&2
+            echo "Supported units: s (seconds), m (minutes), h (hours)" >&2
+            return 1
+            ;;
+    esac
+}
+
 AUTOMATION_ENABLED_VALUE="unknown"
 AUTOMATION_CHECK_NOTE="Not checked"
 SITE_CONFIG_ENDPOINT="/xapi/siteConfig/automation.enabled"
@@ -397,7 +427,7 @@ get_csv_value() {
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-i] [-d] [-D] [-v]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-T <STUCK_TIMEOUT>] [-i] [-d] [-D] [-v]"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -405,7 +435,8 @@ usage() {
     echo "  -c  Container name, ID, or Docker image to run (optional - will list if not provided)"
     echo "  -m  Maximum number of jobs to submit (optional - defaults to all experiments in CSV)"
     echo "  -r  Report project ID to upload results to (optional - creates BATCH_TESTS resource)"
-    echo "  -t  Workflow check interval in seconds (optional - defaults to 10)"
+    echo "  -t  Workflow check interval (optional - defaults to 10s, supports: 30s, 10m, 1h)"
+    echo "  -T  Stuck timeout - exit if no state changes detected (optional - defaults to 10m)"
     echo "  -i  Use individual mode (one API call per experiment) - default is bulk mode (single API call, 200x faster)"
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
@@ -439,7 +470,8 @@ DRY_RUN=false
 DEBUG=false
 VERBOSE=false
 BULK_MODE=true  # Default to bulk mode (200x faster)
-while getopts "h:u:p:f:c:m:r:t:idDv" opt; do
+STUCK_TIMEOUT=$(parse_time "10m")  # Default: 10 minutes
+while getopts "h:u:p:f:c:m:r:t:T:idDv" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -448,7 +480,8 @@ while getopts "h:u:p:f:c:m:r:t:idDv" opt; do
         c) CONTAINER_NAME="$OPTARG" ;;
         m) MAX_JOBS="$OPTARG" ;;
         r) REPORT_PROJECT="$OPTARG" ;;
-        t) CHECK_INTERVAL="$OPTARG" ;;
+        t) CHECK_INTERVAL=$(parse_time "$OPTARG") || exit 1 ;;
+        T) STUCK_TIMEOUT=$(parse_time "$OPTARG") || exit 1 ;;
         i) BULK_MODE=false ;;  # Individual mode (one API call per experiment)
         d) DRY_RUN=true ;;
         D) DEBUG=true ;;
@@ -1040,7 +1073,8 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo -e "${YELLOW}=== MONITORING JOB EXECUTION ===${NC}"
     echo -e "${YELLOW}NOTE: Script will wait for all jobs to complete before exiting${NC}"
     echo ""
-    echo "Monitoring workflow status (checking every 10 seconds)..."
+    TIMEOUT_MIN=$(awk "BEGIN {printf \"%.1f\", $STUCK_TIMEOUT/60}")
+    echo "Monitoring workflow status (checking every ${CHECK_INTERVAL}s, timeout after ${TIMEOUT_MIN}m of no changes)..."
     echo "Press Ctrl+C to stop monitoring and exit early"
     echo ""
 
@@ -1048,7 +1082,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     CHECK_COUNT=0
     LAST_TOTAL=0
     LAST_CHANGE_TIME=$(date +%s)
-    STUCK_THRESHOLD=600  # 10 minutes in seconds
+    LAST_STATE_SNAPSHOT=""  # Track workflow states to detect changes
 
     # Initialize per-workflow tracking file
     WORKFLOW_TRACKING_FILE="${LOG_FILE%.log}_workflow_tracking.jsonl"
@@ -1168,22 +1202,26 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo ""
         fi
 
-        # Check if workflow count has changed
-        if [ "$TOTAL_WORKFLOWS" != "$LAST_TOTAL" ]; then
-            LAST_TOTAL=$TOTAL_WORKFLOWS
+        # Create a snapshot of current workflow states (workflow_id:status)
+        CURRENT_STATE_SNAPSHOT=$(echo "$BATCH_WORKFLOWS" | jq -r '.[] | "\(.workflowId // .workflow_id // .wfid):\(.status)"' 2>/dev/null | sort | tr '\n' '|')
+
+        # Check if any workflow state has changed
+        if [ "$CURRENT_STATE_SNAPSHOT" != "$LAST_STATE_SNAPSHOT" ]; then
+            LAST_STATE_SNAPSHOT="$CURRENT_STATE_SNAPSHOT"
             LAST_CHANGE_TIME=$(date +%s)
         fi
 
-        # Check if stuck (no change for 10 minutes)
+        # Check if stuck (no state changes for configured timeout)
         TIME_STUCK=$(($(date +%s) - LAST_CHANGE_TIME))
-        if [ "$TIME_STUCK" -ge "$STUCK_THRESHOLD" ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
+        if [ "$TIME_STUCK" -ge "$STUCK_TIMEOUT" ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
+            TIMEOUT_MIN=$(awk "BEGIN {printf \"%.1f\", $STUCK_TIMEOUT/60}")
             echo ""
-            echo -e "${RED}⚠ TIMEOUT: Workflow count hasn't changed for 10 minutes!${NC}"
-            echo "Last count: $TOTAL_WORKFLOWS workflows"
+            echo -e "${RED}⚠ TIMEOUT: No workflow state changes detected for ${TIMEOUT_MIN} minutes!${NC}"
+            echo "Current status: $TOTAL_WORKFLOWS workflows"
             echo "Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, Unknown: ${UNKNOWN:-0}"
             echo ""
             echo "This likely indicates:"
-            echo "  - Workflows are stuck in an unrecognized status"
+            echo "  - Workflows are stuck in their current state"
             echo "  - Container service is not processing jobs"
             echo "  - XNAT workflow system may need investigation"
             echo ""

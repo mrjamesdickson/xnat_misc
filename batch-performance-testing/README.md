@@ -111,19 +111,37 @@ Submits container jobs based on experiment metadata from a CSV file.
 
 **Usage:**
 ```bash
-./batch_test_csv.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-s]
+./batch_test_csv.sh -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-T <STUCK_TIMEOUT>] [-i] [-d] [-D] [-v]
 ```
+
+**Options:**
+- `-h` - XNAT host URL (required)
+- `-u` - Username (required)
+- `-p` - Password (required)
+- `-f` - CSV file with experiment IDs (required)
+- `-c` - Container name, ID, or Docker image to run (optional)
+- `-m` - Maximum number of jobs to submit (optional - defaults to all experiments)
+- `-r` - Report project ID to upload results to (optional - creates BATCH_TESTS resource)
+- `-t` - Workflow check interval (optional - defaults to 10s, supports: 30s, 10m, 1h)
+- `-T` - Stuck timeout - exit if no state changes detected (optional - defaults to 10m)
+- `-i` - Use individual mode (one API call per experiment) - default is bulk mode (200x faster)
+- `-d` - Dry-run mode - validate CSV without launching containers
+- `-D` - Debug mode - show detailed API requests and responses
+- `-v` - Verbose mode - show individual workflow details during monitoring
 
 **Example:**
 ```bash
-# Create experiments from CSV and submit jobs
+# Basic usage with default settings
 ./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -c totalsegmentator-scan
 
-# Use existing experiments (skip creation)
-./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -c dcm2niix-scan -s
+# Limit to first 10 experiments with custom monitoring intervals
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -m 10 -t 30s -T 5m
 
-# Limit to first 10 experiments
-./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -m 10
+# With report generation and verbose mode
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -r BATCH_TESTS -v
+
+# Dry-run to validate CSV without launching jobs
+./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -d
 ```
 
 **CSV Format:**
