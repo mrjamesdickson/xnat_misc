@@ -479,6 +479,36 @@ else
     echo -e "${YELLOW}  The report will show an error. Make sure the CSV is in the same directory.${NC}"
 fi
 
+# Helper function to upload with error checking
+upload_file() {
+    local file_path="$1"
+    local content_type="$2"
+    local upload_url="$3"
+    local content_label="$4"
+    local file_name=$(basename "$file_path")
+
+    echo -e "${YELLOW}Uploading ${file_name}...${NC}"
+
+    # Add XNAT-required query parameters
+    local full_url="${upload_url}?format=json&content=${content_label}&inbody=true"
+
+    # Get HTTP status code
+    HTTP_STATUS=$(curl -s -w "%{http_code}" -o /tmp/upload_response.txt \
+        -b "JSESSIONID=$JSESSION" -X PUT \
+        -H "Content-Type: ${content_type}" \
+        --data-binary "@${file_path}" \
+        "${full_url}")
+
+    if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ]; then
+        echo -e "${GREEN}✓ ${file_name} uploaded (HTTP ${HTTP_STATUS})${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Upload failed (HTTP ${HTTP_STATUS})${NC}"
+        echo -e "${RED}Response: $(cat /tmp/upload_response.txt)${NC}"
+        return 1
+    fi
+}
+
 # Upload to XNAT if requested
 if [ -n "$REPORT_PROJECT" ] && [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
     echo ""
@@ -490,6 +520,7 @@ if [ -n "$REPORT_PROJECT" ] && [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n
 
     if [ -z "$JSESSION" ]; then
         echo -e "${RED}✗ Authentication failed${NC}"
+        exit 1
     else
         echo -e "${GREEN}✓ Authenticated${NC}"
 
@@ -499,49 +530,43 @@ if [ -n "$REPORT_PROJECT" ] && [ -n "$XNAT_HOST" ] && [ -n "$USERNAME" ] && [ -n
         # Upload files using original names so HTML can find them
         # Note: Filenames already contain timestamp from log generation
 
+        UPLOAD_FAILED=false
+
         # Upload HTML
-        echo -e "${YELLOW}Uploading HTML report...${NC}"
-        HTML_UPLOAD_NAME=$(basename "$HTML_FILE")
-        curl -s -b "JSESSIONID=$JSESSION" -X PUT \
-            -H "Content-Type: text/html" \
-            --data-binary "@$HTML_FILE" \
-            "${RESOURCE_URL}/files/${HTML_UPLOAD_NAME}" > /dev/null
-        echo -e "${GREEN}✓ HTML uploaded: ${HTML_UPLOAD_NAME}${NC}"
+        if ! upload_file "$HTML_FILE" "text/html" "${RESOURCE_URL}/files/$(basename "$HTML_FILE")" "BATCH_TEST_REPORT"; then
+            UPLOAD_FAILED=true
+        fi
 
         # Upload JSON metadata
-        echo -e "${YELLOW}Uploading metadata JSON...${NC}"
-        JSON_UPLOAD_NAME=$(basename "$METADATA_JSON")
-        curl -s -b "JSESSIONID=$JSESSION" -X PUT \
-            -H "Content-Type: application/json" \
-            --data-binary "@$METADATA_JSON" \
-            "${RESOURCE_URL}/files/${JSON_UPLOAD_NAME}" > /dev/null
-        echo -e "${GREEN}✓ JSON uploaded: ${JSON_UPLOAD_NAME}${NC}"
+        if [ "$UPLOAD_FAILED" = false ]; then
+            if ! upload_file "$METADATA_JSON" "application/json" "${RESOURCE_URL}/files/$(basename "$METADATA_JSON")" "BATCH_TEST_DATA"; then
+                UPLOAD_FAILED=true
+            fi
+        fi
 
         # Upload workflow CSV
-        if [ -f "$WORKFLOW_CSV" ]; then
-            echo -e "${YELLOW}Uploading workflow metrics CSV...${NC}"
-            CSV_UPLOAD_NAME=$(basename "$WORKFLOW_CSV")
-            curl -s -b "JSESSIONID=$JSESSION" -X PUT \
-                -H "Content-Type: text/csv" \
-                --data-binary "@$WORKFLOW_CSV" \
-                "${RESOURCE_URL}/files/${CSV_UPLOAD_NAME}" > /dev/null
-            echo -e "${GREEN}✓ CSV uploaded: ${CSV_UPLOAD_NAME}${NC}"
+        if [ "$UPLOAD_FAILED" = false ] && [ -f "$WORKFLOW_CSV" ]; then
+            if ! upload_file "$WORKFLOW_CSV" "text/csv" "${RESOURCE_URL}/files/$(basename "$WORKFLOW_CSV")" "BATCH_TEST_METRICS"; then
+                UPLOAD_FAILED=true
+            fi
         fi
 
         # Upload original log file for reference
-        if [ -f "$LOG_FILE" ]; then
-            echo -e "${YELLOW}Uploading log file...${NC}"
-            LOG_UPLOAD_NAME=$(basename "$LOG_FILE")
-            curl -s -b "JSESSIONID=$JSESSION" -X PUT \
-                -H "Content-Type: text/plain" \
-                --data-binary "@$LOG_FILE" \
-                "${RESOURCE_URL}/files/${LOG_UPLOAD_NAME}" > /dev/null
-            echo -e "${GREEN}✓ Log uploaded: ${LOG_UPLOAD_NAME}${NC}"
+        if [ "$UPLOAD_FAILED" = false ] && [ -f "$LOG_FILE" ]; then
+            if ! upload_file "$LOG_FILE" "text/plain" "${RESOURCE_URL}/files/$(basename "$LOG_FILE")" "BATCH_TEST_LOG"; then
+                UPLOAD_FAILED=true
+            fi
         fi
 
-        echo ""
-        echo -e "${GREEN}✓ All files uploaded to XNAT${NC}"
-        echo -e "${BLUE}View at: ${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS${NC}"
+        if [ "$UPLOAD_FAILED" = true ]; then
+            echo ""
+            echo -e "${RED}✗ Upload failed - check project exists and you have permissions${NC}"
+            exit 1
+        else
+            echo ""
+            echo -e "${GREEN}✓ All files uploaded to XNAT${NC}"
+            echo -e "${BLUE}View at: ${XNAT_HOST}/data/projects/${REPORT_PROJECT}/resources/BATCH_TESTS${NC}"
+        fi
     fi
 fi
 
