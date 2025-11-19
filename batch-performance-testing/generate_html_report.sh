@@ -1255,8 +1255,53 @@ cat >> "$OUTPUT_FILE" <<EOF
             <div class="log-entries" id="log-entries">
 EOF
 
-# Parse log entries and add to HTML
-grep -E "^\[.*\] (SUCCESS|FAIL)" "$LOG_FILE" | while IFS= read -r line; do
+# Check if workflow metrics CSV exists (for bulk mode)
+WORKFLOW_METRICS_CSV="${LOG_FILE%.log}_workflow_metrics.csv"
+
+if [ -f "$WORKFLOW_METRICS_CSV" ] && [ -s "$WORKFLOW_METRICS_CSV" ]; then
+    # Parse from workflow metrics CSV (bulk mode)
+    echo -e "${YELLOW}Using per-workflow metrics CSV for job details...${NC}"
+
+    tail -n +2 "$WORKFLOW_METRICS_CSV" | while IFS=, read -r workflow_id exp_id status launch_time first_seen last_update queued_dur running_dur total_dur; do
+        # Determine status class
+        if echo "$status" | grep -qi "complete"; then
+            status_class="success"
+            status_symbol="✓"
+            status_text="SUCCESS"
+        elif echo "$status" | grep -qi "fail\|killed"; then
+            status_class="fail"
+            status_symbol="✗"
+            status_text="FAILED"
+        else
+            status_class="pending"
+            status_symbol="⧗"
+            status_text="$status"
+        fi
+
+        # Format timestamp
+        if [ -n "$launch_time" ] && [ "$launch_time" != "N/A" ]; then
+            timestamp=$(echo "$launch_time" | sed 's/T/ /' | cut -d'.' -f1)
+        else
+            timestamp="Unknown"
+        fi
+
+        cat >> "$OUTPUT_FILE" <<LOGENTRY
+                <div class="log-entry $status_class" data-status="$status_class">
+                    <div>
+                        <span class="log-timestamp">$timestamp</span>
+                        <span class="log-status $status_class">$status_symbol $status_text</span>
+                        <span>$exp_id</span>
+                    </div>
+                    <div class="log-details">
+                        Workflow ID: $workflow_id<br>
+                        Queued: ${queued_dur}s | Running: ${running_dur}s | Total: ${total_dur}s
+                    </div>
+                </div>
+LOGENTRY
+    done
+else
+    # Parse from log file (individual mode - legacy)
+    grep -E "^\[.*\] (SUCCESS|FAIL)" "$LOG_FILE" | while IFS= read -r line; do
     # Extract timestamp, status, and experiment ID using awk for reliability
     timestamp=$(echo "$line" | awk '{print $1, $2}')
     exp_id=$(echo "$line" | awk -F' - ' '{print $2}')
@@ -1292,7 +1337,8 @@ LOGENTRY
                     </div>
                 </div>
 LOGENTRY
-done
+    done
+fi
 
 cat >> "$OUTPUT_FILE" <<'EOF'
             </div>
