@@ -143,10 +143,31 @@ Submits container jobs based on experiment metadata from a CSV file.
 # Dry-run to validate CSV without launching jobs
 ./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -d
 
-# Monitor-only mode (resume monitoring after killing the script)
-./batch_test_csv.sh -M -h https://demo02.xnat.org -u admin -p password \
-  -f example_batch.csv -c 70 --hours-ago 1 -r BATCH_TESTS
+# Resume monitoring after killing the script (add --monitor-progress to same command)
+yes | ./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password \
+  -f example_batch.csv -c 70 -m 100 -r BATCH_TESTS --monitor-progress
 ```
+
+**Resume Monitoring After Kill (`--monitor-progress`)**
+
+If you kill the script during monitoring, just rerun the same command with `--monitor-progress` added:
+
+```bash
+# Original command (that you killed)
+yes | ./batch_test_csv.sh -h HOST -u USER -p PASS \
+  -f your_batch.csv -c 70 -m 100 -r test2
+
+# Add --monitor-progress to resume (everything else stays the same!)
+yes | ./batch_test_csv.sh -h HOST -u USER -p PASS \
+  -f your_batch.csv -c 70 -m 100 -r test2 --monitor-progress
+```
+
+How it works:
+- Checks if workflows already exist for this container
+- If yes: skips submission, resumes monitoring
+- If no: proceeds with normal submission
+
+This is the simplest approach - just add one flag!
 
 **Monitor-Only Mode (`-M`)**
 

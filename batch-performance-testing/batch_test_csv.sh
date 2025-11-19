@@ -444,6 +444,7 @@ usage() {
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
     echo "  -v  Verbose mode - show individual workflow details during monitoring"
+    echo "  --monitor-progress  Resume monitoring - skip submission if workflows exist (add to same command after killing script)"
     echo ""
     echo "Monitor-Only Mode (resume monitoring after script was killed):"
     echo "  -M              Enable monitor-only mode (no job submission)"
@@ -494,6 +495,7 @@ MONITOR_ONLY=false
 MONITOR_START_TIME=""
 MONITOR_HOURS_AGO=""
 MONITOR_PROJECTS=""
+MONITOR_PROGRESS=false
 
 # Parse long options first
 ARGS=("$@")
@@ -512,6 +514,10 @@ while [ $i -lt ${#ARGS[@]} ]; do
         --projects)
             MONITOR_PROJECTS="${ARGS[$((i+1))]}"
             i=$((i+2))
+            ;;
+        --monitor-progress)
+            MONITOR_PROGRESS=true
+            i=$((i+1))
             ;;
         *)
             FILTERED_ARGS+=("${ARGS[$i]}")
@@ -897,12 +903,82 @@ echo -e "${YELLOW}[5/5] Ready to launch containers${NC}"
 echo "Note: Experiments must already exist in XNAT"
 echo ""
 
-# Prepare for submission
-echo -e "${YELLOW}Preparing for batch submission...${NC}"
-echo ""
+# Check for existing workflows if --monitor-progress is set
+if [ "$MONITOR_PROGRESS" = true ]; then
+    echo -e "${CYAN}Checking for existing workflows (--monitor-progress mode)...${NC}"
+    echo ""
 
-# Confirm batch submission or show dry-run summary
-if [ "$DRY_RUN" = true ]; then
+    # Query workflows from all projects
+    ALL_WORKFLOWS="[]"
+    for project in $PROJECTS; do
+        PROJECT_WORKFLOWS=$(curl_api -X POST \
+            -b "JSESSIONID=$JSESSION" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            "${XNAT_HOST}/xapi/workflows" \
+            -d "{\"id\":\"$project\",\"data_type\":\"xnat:projectData\",\"sortable\":true,\"days\":7}" 2>/dev/null)
+
+        if [ -n "$PROJECT_WORKFLOWS" ]; then
+            PROJECT_ITEMS=$(echo "$PROJECT_WORKFLOWS" | jq 'if type == "array" then . else .items // .workflows // [] end' 2>/dev/null)
+            ALL_WORKFLOWS=$(echo "$ALL_WORKFLOWS" "$PROJECT_ITEMS" | jq -s '.[0] + .[1]' 2>/dev/null)
+        fi
+    done
+
+    # Filter workflows for this wrapper
+    EXISTING_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq --arg wrapper "$WRAPPER_NAME" '
+        map(select((.pipelineName // .pipeline_name // "") == $wrapper))
+    ' 2>/dev/null)
+
+    EXISTING_COUNT=$(echo "$EXISTING_WORKFLOWS" | jq 'length' 2>/dev/null)
+
+    if [ "$EXISTING_COUNT" -gt 0 ]; then
+        echo -e "${GREEN}Found $EXISTING_COUNT existing workflows for wrapper '$WRAPPER_NAME'${NC}"
+
+        # Get the earliest launch time as BATCH_START_TIME
+        BATCH_START_TIME=$(echo "$EXISTING_WORKFLOWS" | jq -r '
+            map(.launchTime // .launch_time // 0) | map(select(. > 0)) | min / 1000 | floor
+        ' 2>/dev/null)
+
+        if [ -z "$BATCH_START_TIME" ] || [ "$BATCH_START_TIME" = "null" ]; then
+            BATCH_START_TIME=$(date -v "-1H" +%s 2>/dev/null || date -d "1 hour ago" +%s)
+        fi
+
+        echo "Earliest workflow: $(date -r $BATCH_START_TIME '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d @$BATCH_START_TIME '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        echo -e "${YELLOW}Skipping job submission - resuming monitoring of existing workflows${NC}"
+        echo ""
+
+        # Set up for monitoring
+        SUCCESS_COUNT=$EXISTING_COUNT
+        SUBMITTED_COUNT=$EXISTING_COUNT
+
+        # Create log file
+        TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
+        LOG_FILE="logs/$(date +%Y-%m-%d)/batch_monitor_${TIMESTAMP}.log"
+        mkdir -p "$(dirname "$LOG_FILE")"
+
+        # Skip to monitoring section
+        SKIP_SUBMISSION=true
+    else
+        echo -e "${YELLOW}No existing workflows found - proceeding with normal submission${NC}"
+        echo ""
+        SKIP_SUBMISSION=false
+    fi
+else
+    SKIP_SUBMISSION=false
+fi
+
+# Prepare for submission (unless skipping)
+if [ "$SKIP_SUBMISSION" != true ]; then
+    echo -e "${YELLOW}Preparing for batch submission...${NC}"
+    echo ""
+fi
+
+# Confirm batch submission or show dry-run summary (unless skipping)
+if [ "$SKIP_SUBMISSION" = true ]; then
+    echo -e "${GREEN}Skipping submission - monitoring existing workflows${NC}"
+    echo ""
+elif [ "$DRY_RUN" = true ]; then
     echo -e "${BLUE}=== DRY RUN SUMMARY ===${NC}"
     echo "Experiments to launch: $EXPERIMENT_COUNT"
     echo "Container: $CONTAINER_NAME (ID: $WRAPPER_ID)"
