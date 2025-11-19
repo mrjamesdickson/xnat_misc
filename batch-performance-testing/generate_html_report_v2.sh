@@ -74,18 +74,26 @@ HOST=$(grep "^Host:" "$LOG_FILE" | head -1 | sed 's/Host: //' || echo "N/A")
 USER=$(grep "^User:" "$LOG_FILE" | head -1 | sed 's/User: //' || echo "N/A")
 CSV_FILE=$(grep "^CSV File:" "$LOG_FILE" | head -1 | sed 's/CSV File: //' || echo "N/A")
 CONTAINER=$(grep "^Container:" "$LOG_FILE" | head -1 | sed 's/Container: //' || echo "N/A")
-JOBS_SUBMITTED=$(grep "^Jobs Submitted:" "$LOG_FILE" | sed 's/Jobs Submitted: //' || echo "0")
-SUCCESS_COUNT=$(grep "Successfully Queued:" "$LOG_FILE" | sed -E 's/.*Successfully Queued: ([0-9]+).*/\1/' || echo "0")
-FAIL_COUNT=$(grep "Failed to Queue:" "$LOG_FILE" | sed -E 's/.*Failed to Queue: ([0-9]+).*/\1/' || echo "0")
-SUBMISSION_DURATION=$(grep "Submission Duration:" "$LOG_FILE" | sed -E 's/.*Submission Duration: ([^ ]+).*/\1/' || echo "0s")
-EXECUTION_DURATION=$(grep "Execution Duration:" "$LOG_FILE" | sed -E 's/.*Execution Duration: ([^ ]+).*/\1/' || echo "0s")
-THROUGHPUT=$(grep "Submission Throughput:" "$LOG_FILE" | sed -E 's/.*Submission Throughput: ([^ ]+).*/\1/' || echo "0.00")
+JOBS_SUBMITTED=$(grep "Jobs Submitted:" "$LOG_FILE" | sed -E 's/.*Jobs Submitted: ([0-9]+).*/\1/' || echo "0")
+SUCCESS_COUNT=$(grep "Successful:" "$LOG_FILE" | sed -E 's/.*Successful: ([0-9]+).*/\1/' || echo "0")
+FAIL_COUNT=$(grep "Failed:" "$LOG_FILE" | sed -E 's/.*Failed: ([0-9]+).*/\1/' || echo "0")
+SUBMISSION_DURATION=$(grep "Total Duration:" "$LOG_FILE" | head -1 | sed -E 's/.*Total Duration: ([^ ]+).*/\1/' || echo "0s")
+EXECUTION_DURATION=$(grep "Execution Time:" "$LOG_FILE" | head -1 | sed -E 's/.*Execution Time: ([^ ]+).*/\1/' || echo "0s")
+THROUGHPUT=$(grep "Throughput:" "$LOG_FILE" | sed -E 's/.*Throughput: ([0-9.]+).*/\1/' || echo "0.00")
 
 # Extract query performance data (BSD-compatible)
 QUERY_TIMES=$(grep -oE 'query: [0-9.]+s' "$LOG_FILE" 2>/dev/null | sed 's/query: //; s/s$//' || echo "")
 
 # Build JSON
 echo -e "${YELLOW}Creating metadata JSON...${NC}"
+
+# Ensure numeric values default to 0
+JOBS_SUBMITTED=${JOBS_SUBMITTED:-0}
+SUCCESS_COUNT=${SUCCESS_COUNT:-0}
+FAIL_COUNT=${FAIL_COUNT:-0}
+SUBMISSION_DURATION=${SUBMISSION_DURATION:-"0s"}
+EXECUTION_DURATION=${EXECUTION_DURATION:-"0s"}
+THROUGHPUT=${THROUGHPUT:-"0.00"}
 
 cat > "$METADATA_JSON" <<EOF
 {
