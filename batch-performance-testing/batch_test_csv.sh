@@ -1271,8 +1271,8 @@ with open(sys.argv[1], 'r') as f:
         except:
             continue
 
-# Calculate metrics for each workflow
-print("WorkflowID,ExperimentID,Status,LaunchTime,FirstSeen,LastUpdate,QueuedDuration,RunningDuration,TotalDuration")
+# Calculate metrics for each workflow with ALL state transitions
+print("WorkflowID,ExperimentID,Status,LaunchTime,FirstSeen,LastUpdate,QueuedDuration,RunningDuration,TotalDuration,StateTimeline")
 for wf_id, states in workflows.items():
     # Sort by check time
     states.sort(key=lambda x: x['checkTime'])
@@ -1282,6 +1282,28 @@ for wf_id, states in workflows.items():
     first_seen = states[0]['checkTime']
     last_update = states[-1]['checkTime']
     final_status = states[-1]['status']
+
+    # Track state transitions with timing
+    state_timeline = []
+    prev_status = None
+    prev_time = launch_time
+
+    for state in states:
+        status = state['status']
+        check_time = state['checkTime']
+
+        # Only record when state changes
+        if status != prev_status:
+            if prev_status is not None:
+                duration = check_time - prev_time
+                state_timeline.append(f"{prev_status}:{duration:.1f}s")
+            prev_status = status
+            prev_time = check_time
+
+    # Add final state duration
+    if prev_status:
+        duration = last_update - prev_time
+        state_timeline.append(f"{prev_status}:{duration:.1f}s")
 
     # Find when it transitioned to Running and Complete/Failed
     running_time = None
@@ -1306,8 +1328,9 @@ for wf_id, states in workflows.items():
     launch_str = datetime.fromtimestamp(launch_time).isoformat() if launch_time else "N/A"
     first_seen_str = datetime.fromtimestamp(first_seen).isoformat() if first_seen else "N/A"
     last_update_str = datetime.fromtimestamp(last_update).isoformat() if last_update else "N/A"
+    timeline_str = " -> ".join(state_timeline)
 
-    print(f"{wf_id},{experiment_id},{final_status},{launch_str},{first_seen_str},{last_update_str},{queued_duration:.1f},{running_duration:.1f},{total_duration:.1f}")
+    print(f"{wf_id},{experiment_id},{final_status},{launch_str},{first_seen_str},{last_update_str},{queued_duration:.1f},{running_duration:.1f},{total_duration:.1f},{timeline_str}")
 PYTHON_SCRIPT
 
     python3 /tmp/process_workflows_$$.py "$WORKFLOW_TRACKING_FILE" > "$WORKFLOW_METRICS_CSV" 2>/dev/null
