@@ -448,6 +448,7 @@ cat > "$OUTPUT_FILE" <<EOF
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XNAT Batch Performance Test Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -1242,6 +1243,175 @@ WFEOF
 WFEOF
     fi
 fi
+
+# Extract query performance data from log
+QUERY_PERF_DATA=$(grep -oP 'Check \K\d+.*query: \K[\d.]+' "$LOG_FILE" 2>/dev/null || echo "")
+
+# Extract workflow timing data if CSV exists
+if [ -f "$WORKFLOW_METRICS_CSV" ]; then
+    WF_TIMING_DATA=$(tail -n +2 "$WORKFLOW_METRICS_CSV" | awk -F',' '{print $7","$8","$9}')
+fi
+
+cat >> "$OUTPUT_FILE" <<'EOF'
+
+        <div class="section">
+            <h2 class="section-title">Performance Charts</h2>
+
+            <div class="chart-wrapper">
+                <h3>Query Response Time Over Test Duration</h3>
+                <canvas id="queryPerfChart"></canvas>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3>Workflow Execution Time Distribution</h3>
+                <canvas id="workflowTimingChart"></canvas>
+            </div>
+        </div>
+
+        <script>
+        // Query Performance Chart
+        const queryPerfCtx = document.getElementById('queryPerfChart');
+        if (queryPerfCtx) {
+EOF
+
+# Add query performance data
+if [ -n "$QUERY_PERF_DATA" ]; then
+    cat >> "$OUTPUT_FILE" <<EOF
+            const queryData = [$(echo "$QUERY_PERF_DATA" | tr '\n' ',' | sed 's/,$//')];
+            const queryLabels = Array.from({length: queryData.length}, (_, i) => 'Check ' + (i + 1));
+
+            new Chart(queryPerfCtx, {
+                type: 'line',
+                data: {
+                    labels: queryLabels,
+                    datasets: [{
+                        label: 'Query Response Time (seconds)',
+                        data: queryData,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'XNAT API Response Time for Workflow Status Queries'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => context.parsed.y.toFixed(3) + 's'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Response Time (seconds)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Status Check Number'
+                            }
+                        }
+                    }
+                }
+            });
+EOF
+else
+    cat >> "$OUTPUT_FILE" <<'EOF'
+            queryPerfCtx.parentElement.innerHTML = '<p style="text-align:center;padding:40px;color:#999;">No query performance data available</p>';
+EOF
+fi
+
+cat >> "$OUTPUT_FILE" <<'EOF'
+        }
+
+        // Workflow Timing Chart
+        const workflowTimingCtx = document.getElementById('workflowTimingChart');
+        if (workflowTimingCtx) {
+EOF
+
+# Add workflow timing data
+if [ -f "$WORKFLOW_METRICS_CSV" ]; then
+    WF_QUEUED=$(tail -n +2 "$WORKFLOW_METRICS_CSV" | cut -d',' -f7 | tr '\n' ',' | sed 's/,$//')
+    WF_RUNNING=$(tail -n +2 "$WORKFLOW_METRICS_CSV" | cut -d',' -f8 | tr '\n' ',' | sed 's/,$//')
+
+    cat >> "$OUTPUT_FILE" <<EOF
+            const queuedTimes = [${WF_QUEUED}];
+            const runningTimes = [${WF_RUNNING}];
+            const workflowLabels = Array.from({length: queuedTimes.length}, (_, i) => 'WF' + (i + 1));
+
+            new Chart(workflowTimingCtx, {
+                type: 'bar',
+                data: {
+                    labels: workflowLabels,
+                    datasets: [
+                        {
+                            label: 'Queued Time',
+                            data: queuedTimes,
+                            backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                            stack: 'Stack 0'
+                        },
+                        {
+                            label: 'Running Time',
+                            data: runningTimes,
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            stack: 'Stack 0'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Workflow Queue + Execution Time (Stacked)'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => context.dataset.label + ': ' + context.parsed.y.toFixed(1) + 's'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Time (seconds)'
+                            }
+                        },
+                        x: {
+                            stacked: true,
+                            display: workflowLabels.length <= 50,
+                            title: {
+                                display: true,
+                                text: 'Workflow Number'
+                            }
+                        }
+                    }
+                }
+            });
+EOF
+else
+    cat >> "$OUTPUT_FILE" <<'EOF'
+            workflowTimingCtx.parentElement.innerHTML = '<p style="text-align:center;padding:40px;color:#999;">No workflow timing data available</p>';
+EOF
+fi
+
+cat >> "$OUTPUT_FILE" <<'EOF'
+        }
+        </script>
+
+EOF
 
 cat >> "$OUTPUT_FILE" <<EOF
 
