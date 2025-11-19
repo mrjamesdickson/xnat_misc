@@ -614,24 +614,29 @@ if [ -z "$CONTAINER_NAME" ]; then
     fi
 fi
 
-# Get wrapper ID
+# Get wrapper ID and name
 if [ -z "$COMMANDS" ]; then
     COMMANDS=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/commands" -H "Accept: application/json")
 fi
 
-WRAPPER_ID=$(echo "$COMMANDS" | jq -r --arg name "$CONTAINER_NAME" '
+# Extract both ID and name for the selected wrapper
+WRAPPER_INFO=$(echo "$COMMANDS" | jq -r --arg name "$CONTAINER_NAME" '
     .[] |
     (.image // "") as $img |
     (.xnat // .["xnat-command-wrappers"] // .xnatCommandWrappers // [])[] |
     select(.name == $name or (.id|tostring) == $name or $img == $name) |
-    .id
+    "\(.id)|\(.name)"
 ' | head -1)
 
-if [ -z "$WRAPPER_ID" ]; then
+if [ -z "$WRAPPER_INFO" ]; then
     WRAPPER_ID="$CONTAINER_NAME"
+    WRAPPER_NAME="$CONTAINER_NAME"
+else
+    WRAPPER_ID=$(echo "$WRAPPER_INFO" | cut -d'|' -f1)
+    WRAPPER_NAME=$(echo "$WRAPPER_INFO" | cut -d'|' -f2)
 fi
 
-echo -e "${GREEN}✓ Container: $CONTAINER_NAME (ID: $WRAPPER_ID)${NC}"
+echo -e "${GREEN}✓ Container: $CONTAINER_NAME (ID: $WRAPPER_ID, Name: $WRAPPER_NAME)${NC}"
 echo ""
 
 # Step 4: Enable wrapper for all projects (only from selected experiments)
@@ -1036,6 +1041,9 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
     WORKFLOW_START_TIME=$(date +%s)
     CHECK_COUNT=0
+    LAST_TOTAL=0
+    LAST_CHANGE_TIME=$(date +%s)
+    STUCK_THRESHOLD=600  # 10 minutes in seconds
 
     while true; do
         sleep 10
@@ -1074,7 +1082,8 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         fi
 
         # Filter workflows to only those from our batch (after BATCH_START_TIME)
-        BATCH_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq --arg container "$CONTAINER_NAME" --argjson start_time "$BATCH_START_TIME" '
+        # Use WRAPPER_NAME (not CONTAINER_NAME) because XNAT stores the wrapper name in pipelineName
+        BATCH_WORKFLOWS=$(echo "$ALL_WORKFLOWS" | jq --arg container "$WRAPPER_NAME" --argjson start_time "$BATCH_START_TIME" '
             map(select(
                 (.pipelineName // .pipeline_name // "") == $container and
                 ((.launchTime // .launch_time // 0) / 1000) >= $start_time
@@ -1103,10 +1112,19 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         FAILED=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Failed|Killed"; "i"))] | length' 2>/dev/null)
         PENDING=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Queued|Pending|Finalizing"; "i"))] | length' 2>/dev/null)
 
+        # Count workflows with unknown status (don't match any known pattern)
+        UNKNOWN=$(echo "$BATCH_WORKFLOWS" | jq '[.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing"; "i") | not)] | length' 2>/dev/null)
+
         # Clean up display line
         echo -ne "\r                                                                                           \r"
 
-        echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+        if [ "${UNKNOWN:-0}" -gt 0 ]; then
+            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, UNKNOWN: ${UNKNOWN}"
+            echo -e "${RED}WARNING: ${UNKNOWN} workflows have unknown status!${NC}"
+            echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
+        else
+            echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+        fi
 
         # Show individual workflow details in verbose mode
         if [ "$VERBOSE" = true ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
@@ -1115,8 +1133,34 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo ""
         fi
 
-        # Check if all jobs are done (none running or pending)
-        if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -ge "$SUCCESS_COUNT" ]; then
+        # Check if workflow count has changed
+        if [ "$TOTAL_WORKFLOWS" != "$LAST_TOTAL" ]; then
+            LAST_TOTAL=$TOTAL_WORKFLOWS
+            LAST_CHANGE_TIME=$(date +%s)
+        fi
+
+        # Check if stuck (no change for 10 minutes)
+        TIME_STUCK=$(($(date +%s) - LAST_CHANGE_TIME))
+        if [ "$TIME_STUCK" -ge "$STUCK_THRESHOLD" ] && [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
+            echo ""
+            echo -e "${RED}⚠ TIMEOUT: Workflow count hasn't changed for 10 minutes!${NC}"
+            echo "Last count: $TOTAL_WORKFLOWS workflows"
+            echo "Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}, Unknown: ${UNKNOWN:-0}"
+            echo ""
+            echo "This likely indicates:"
+            echo "  - Workflows are stuck in an unrecognized status"
+            echo "  - Container service is not processing jobs"
+            echo "  - XNAT workflow system may need investigation"
+            echo ""
+
+            # Treat as completion and generate report
+            COMPLETE=${COMPLETE:-0}
+            FAILED=${FAILED:-0}
+            break
+        fi
+
+        # Check if all jobs are done (none running, pending, or unknown)
+        if [ "${RUNNING:-0}" -eq 0 ] && [ "${PENDING:-0}" -eq 0 ] && [ "${UNKNOWN:-0}" -eq 0 ] && [ "$TOTAL_WORKFLOWS" -ge "$SUCCESS_COUNT" ]; then
             echo ""
             echo -e "${GREEN}✓ All jobs completed!${NC}"
             echo ""
