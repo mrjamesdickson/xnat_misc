@@ -428,6 +428,9 @@ get_csv_value() {
 # Usage
 usage() {
     echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -f <CSV_FILE> [-c <CONTAINER_NAME>] [-m <MAX_JOBS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-T <STUCK_TIMEOUT>] [-i] [-d] [-D] [-v]"
+    echo "   OR: $0 -M -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> -c <CONTAINER> --start-time <TIME> [--projects <PROJECTS>] [-r <REPORT_PROJECT>] [-t <CHECK_INTERVAL>] [-T <STUCK_TIMEOUT>] [-v]"
+    echo ""
+    echo "Standard Mode:"
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
@@ -441,6 +444,22 @@ usage() {
     echo "  -d  Dry-run mode - validate CSV and show what would be done without actually launching containers"
     echo "  -D  Debug mode - show detailed API requests and responses"
     echo "  -v  Verbose mode - show individual workflow details during monitoring"
+    echo ""
+    echo "Monitor-Only Mode (resume monitoring after script was killed):"
+    echo "  -M              Enable monitor-only mode (no job submission)"
+    echo "  -c              Container/wrapper name or ID (required in monitor mode)"
+    echo "  --start-time    Start time for workflow filtering (format: 'YYYY-MM-DD HH:MM:SS' or epoch seconds)"
+    echo "  --hours-ago     Alternative to --start-time: monitor workflows from N hours ago (e.g., 1, 2.5)"
+    echo "  --projects      Comma-separated list of projects to monitor (optional - auto-detects if not specified)"
+    echo "  -r              Report project ID to upload results to (optional)"
+    echo ""
+    echo "Monitor-Only Examples:"
+    echo "  # Resume monitoring workflows from last 2 hours"
+    echo "  $0 -M -h https://xnat.example.com -u admin -p password -c 70 --hours-ago 2 -r BATCH_TESTS"
+    echo ""
+    echo "  # Monitor specific time range and projects"
+    echo "  $0 -M -h https://xnat.example.com -u admin -p password -c totalsegmentator \\"
+    echo "    --start-time '2025-11-19 10:30:00' --projects 'test1,test2' -r BATCH_TESTS"
     echo ""
     echo "Required CSV columns (can be in any order, extra columns ignored):"
     echo "  ID, Project"
@@ -471,7 +490,41 @@ DEBUG=false
 VERBOSE=false
 BULK_MODE=true  # Default to bulk mode (200x faster)
 STUCK_TIMEOUT=$(parse_time "10m")  # Default: 10 minutes
-while getopts "h:u:p:f:c:m:r:t:T:idDv" opt; do
+MONITOR_ONLY=false
+MONITOR_START_TIME=""
+MONITOR_HOURS_AGO=""
+MONITOR_PROJECTS=""
+
+# Parse long options first
+ARGS=("$@")
+FILTERED_ARGS=()
+i=0
+while [ $i -lt ${#ARGS[@]} ]; do
+    case "${ARGS[$i]}" in
+        --start-time)
+            MONITOR_START_TIME="${ARGS[$((i+1))]}"
+            i=$((i+2))
+            ;;
+        --hours-ago)
+            MONITOR_HOURS_AGO="${ARGS[$((i+1))]}"
+            i=$((i+2))
+            ;;
+        --projects)
+            MONITOR_PROJECTS="${ARGS[$((i+1))]}"
+            i=$((i+2))
+            ;;
+        *)
+            FILTERED_ARGS+=("${ARGS[$i]}")
+            i=$((i+1))
+            ;;
+    esac
+done
+
+# Reset positional parameters with filtered args
+set -- "${FILTERED_ARGS[@]}"
+
+# Parse short options with getopts
+while getopts "h:u:p:f:c:m:r:t:T:idDvM" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
@@ -486,36 +539,165 @@ while getopts "h:u:p:f:c:m:r:t:T:idDv" opt; do
         d) DRY_RUN=true ;;
         D) DEBUG=true ;;
         v) VERBOSE=true ;;
+        M) MONITOR_ONLY=true ;;
         *) usage ;;
     esac
 done
 
-if [ -z "$XNAT_HOST" ] || [ -z "$USERNAME" ] || [ -z "$PASSWORD" ] || [ -z "$CSV_FILE" ]; then
-    usage
-fi
+# Validation for monitor-only mode
+if [ "$MONITOR_ONLY" = true ]; then
+    if [ -z "$XNAT_HOST" ] || [ -z "$USERNAME" ] || [ -z "$PASSWORD" ] || [ -z "$CONTAINER_NAME" ]; then
+        echo -e "${RED}Monitor-only mode requires: -h, -u, -p, -c${NC}"
+        usage
+        exit 1
+    fi
+    if [ -z "$MONITOR_START_TIME" ] && [ -z "$MONITOR_HOURS_AGO" ]; then
+        echo -e "${RED}Monitor-only mode requires either --start-time or --hours-ago${NC}"
+        usage
+        exit 1
+    fi
+    # CSV file is optional in monitor mode (for auto-detecting projects)
+    if [ -n "$CSV_FILE" ] && [ ! -f "$CSV_FILE" ]; then
+        echo -e "${RED}CSV file not found: $CSV_FILE${NC}"
+        exit 1
+    fi
+else
+    # Standard mode validation
+    if [ -z "$XNAT_HOST" ] || [ -z "$USERNAME" ] || [ -z "$PASSWORD" ] || [ -z "$CSV_FILE" ]; then
+        usage
+        exit 1
+    fi
 
-# Validate CSV file exists
-if [ ! -f "$CSV_FILE" ]; then
-    echo -e "${RED}CSV file not found: $CSV_FILE${NC}"
-    exit 1
+    # Validate CSV file exists
+    if [ ! -f "$CSV_FILE" ]; then
+        echo -e "${RED}CSV file not found: $CSV_FILE${NC}"
+        exit 1
+    fi
 fi
 
 # Remove trailing slash from host
 XNAT_HOST="${XNAT_HOST%/}"
 
-if [ "$DRY_RUN" = true ]; then
-    echo -e "${BLUE}=== XNAT CSV Batch Container Launch - DRY RUN MODE ===${NC}"
-    echo -e "${YELLOW}No containers will be launched. Validating CSV only.${NC}"
-else
-    echo -e "${GREEN}=== XNAT CSV Batch Container Launch ===${NC}"
-fi
-echo "Host: $XNAT_HOST"
-echo "User: $USERNAME"
-echo "CSV File: $CSV_FILE"
-[ "$DRY_RUN" = true ] && echo "Mode: DRY RUN"
-echo ""
+# Monitor-only mode setup
+if [ "$MONITOR_ONLY" = true ]; then
+    echo -e "${CYAN}=== XNAT Workflow Monitor (Resume Mode) ===${NC}"
+    echo "Host: $XNAT_HOST"
+    echo "User: $USERNAME"
+    echo "Container: $CONTAINER_NAME"
+    echo ""
 
-# Step 1: Authenticate
+    # Step 1: Authenticate
+    echo -e "${YELLOW}[1/3] Authenticating...${NC}"
+    JSESSION=$(curl_api -u "${USERNAME}:${PASSWORD}" "${XNAT_HOST}/data/JSESSION")
+
+    if [ -z "$JSESSION" ]; then
+        echo -e "${RED}Failed to authenticate${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Authenticated${NC}"
+    echo ""
+
+    # Step 2: Calculate start time
+    echo -e "${YELLOW}[2/3] Determining time window...${NC}"
+    if [ -n "$MONITOR_HOURS_AGO" ]; then
+        # Calculate start time from hours ago
+        BATCH_START_TIME=$(date -v "-${MONITOR_HOURS_AGO}H" +%s 2>/dev/null || date -d "${MONITOR_HOURS_AGO} hours ago" +%s 2>/dev/null)
+        echo "Monitoring workflows from last $MONITOR_HOURS_AGO hour(s)"
+        echo "Start time: $(date -r $BATCH_START_TIME '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d @$BATCH_START_TIME '+%Y-%m-%d %H:%M:%S')"
+    else
+        # Parse start time
+        if [[ "$MONITOR_START_TIME" =~ ^[0-9]+$ ]]; then
+            # Already epoch seconds
+            BATCH_START_TIME="$MONITOR_START_TIME"
+        else
+            # Parse datetime string
+            BATCH_START_TIME=$(date -j -f "%Y-%m-%d %H:%M:%S" "$MONITOR_START_TIME" +%s 2>/dev/null || date -d "$MONITOR_START_TIME" +%s 2>/dev/null)
+        fi
+        echo "Start time: $(date -r $BATCH_START_TIME '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d @$BATCH_START_TIME '+%Y-%m-%d %H:%M:%S')"
+    fi
+    echo ""
+
+    # Step 3: Resolve container/wrapper
+    echo -e "${YELLOW}[3/3] Resolving container/wrapper...${NC}"
+
+    # Check if CONTAINER_NAME is numeric (wrapper ID)
+    if [[ "$CONTAINER_NAME" =~ ^[0-9]+$ ]]; then
+        WRAPPER_ID="$CONTAINER_NAME"
+        # Fetch wrapper name
+        WRAPPER_INFO=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/wrappers/${WRAPPER_ID}")
+        WRAPPER_NAME=$(echo "$WRAPPER_INFO" | jq -r '.name // empty' 2>/dev/null)
+        if [ -z "$WRAPPER_NAME" ]; then
+            echo -e "${RED}Failed to resolve wrapper ID $WRAPPER_ID${NC}"
+            exit 1
+        fi
+    else
+        # Assume it's a wrapper name, need to look up ID
+        WRAPPER_NAME="$CONTAINER_NAME"
+        WRAPPER_LIST=$(curl_api -b "JSESSIONID=$JSESSION" "${XNAT_HOST}/xapi/wrappers")
+        WRAPPER_ID=$(echo "$WRAPPER_LIST" | jq -r ".[] | select(.name == \"$WRAPPER_NAME\") | .id" 2>/dev/null | head -1)
+        if [ -z "$WRAPPER_ID" ]; then
+            echo -e "${RED}Failed to find wrapper named '$WRAPPER_NAME'${NC}"
+            exit 1
+        fi
+    fi
+
+    echo "Wrapper: $WRAPPER_NAME (ID: $WRAPPER_ID)"
+    echo ""
+
+    # Set up projects
+    if [ -n "$MONITOR_PROJECTS" ]; then
+        PROJECTS=$(echo "$MONITOR_PROJECTS" | tr ',' '\n')
+        echo "Monitoring projects: $MONITOR_PROJECTS"
+    elif [ -n "$CSV_FILE" ]; then
+        # Extract projects from CSV file
+        echo "Extracting projects from CSV file..."
+        CSV_HEADER=$(head -1 "$CSV_FILE")
+        if parse_csv_header "$CSV_HEADER" 2>/dev/null; then
+            PROJECTS=$(tail -n +2 "$CSV_FILE" | awk -F',' -v col="$COL_PROJECT" '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $col); print $col}' | sort -u)
+            PROJECT_COUNT=$(echo "$PROJECTS" | wc -l | tr -d ' ')
+            echo "Found $PROJECT_COUNT project(s) in CSV: $(echo $PROJECTS | tr '\n' ', ' | sed 's/,$//')"
+        else
+            echo -e "${YELLOW}Warning: Could not parse CSV, will auto-detect projects from workflows${NC}"
+            PROJECTS=""
+        fi
+    else
+        echo "Projects: Will auto-detect from workflows"
+        PROJECTS=""  # Will be populated from workflows found
+    fi
+    echo ""
+
+    # Create log file
+    TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
+    LOG_FILE="logs/$(date +%Y-%m-%d)/batch_monitor_${TIMESTAMP}.log"
+    mkdir -p "$(dirname "$LOG_FILE")"
+    echo "Log file: $LOG_FILE"
+    echo ""
+
+    # Set counters for monitoring
+    SUCCESS_COUNT=0  # Will be determined from workflows
+    SUBMITTED_COUNT=0  # Will be determined from workflows
+
+    echo -e "${GREEN}Starting workflow monitoring...${NC}"
+    echo ""
+
+# Skip to monitoring section (will be handled by the existing monitoring code)
+
+else
+    # Standard mode
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "${BLUE}=== XNAT CSV Batch Container Launch - DRY RUN MODE ===${NC}"
+        echo -e "${YELLOW}No containers will be launched. Validating CSV only.${NC}"
+    else
+        echo -e "${GREEN}=== XNAT CSV Batch Container Launch ===${NC}"
+    fi
+    echo "Host: $XNAT_HOST"
+    echo "User: $USERNAME"
+    echo "CSV File: $CSV_FILE"
+    [ "$DRY_RUN" = true ] && echo "Mode: DRY RUN"
+    echo ""
+
+    # Step 1: Authenticate
 echo -e "${YELLOW}[1/5] Authenticating...${NC}"
 JSESSION=$(curl_api -u "${USERNAME}:${PASSWORD}" "${XNAT_HOST}/data/JSESSION")
 
@@ -1066,9 +1248,12 @@ echo ""
 echo -e "${YELLOW}Full log saved to: $LOG_FILE${NC}"
 echo ""
 
+fi  # End of standard mode (else block for MONITOR_ONLY)
+
 # Wait for jobs to complete (MANDATORY - script will NOT exit until jobs finish)
 # This ensures the final report contains ACTUAL completion status, not just submission status
-if [ "$SUCCESS_COUNT" -gt 0 ]; then
+# In monitor-only mode, always monitor regardless of SUCCESS_COUNT
+if [ "$SUCCESS_COUNT" -gt 0 ] || [ "$MONITOR_ONLY" = true ]; then
     echo ""
     echo -e "${YELLOW}=== MONITORING JOB EXECUTION ===${NC}"
     echo -e "${YELLOW}NOTE: Script will wait for all jobs to complete before exiting${NC}"

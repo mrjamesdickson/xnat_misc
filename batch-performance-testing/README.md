@@ -142,7 +142,36 @@ Submits container jobs based on experiment metadata from a CSV file.
 
 # Dry-run to validate CSV without launching jobs
 ./batch_test_csv.sh -h https://demo02.xnat.org -u admin -p password -f example_batch.csv -d
+
+# Monitor-only mode (resume monitoring after killing the script)
+./batch_test_csv.sh -M -h https://demo02.xnat.org -u admin -p password \
+  -f example_batch.csv -c 70 --hours-ago 1 -r BATCH_TESTS
 ```
+
+**Monitor-Only Mode (`-M`)**
+
+Resume monitoring workflows after killing the script, without resubmitting jobs:
+
+```bash
+# Simple example: monitor last hour of workflows using CSV projects
+./batch_test_csv.sh -M -h HOST -u USER -p PASS \
+  -f your_batch.csv -c 70 --hours-ago 1
+
+# Specify exact start time instead of hours-ago
+./batch_test_csv.sh -M -h HOST -u USER -p PASS \
+  -c totalsegmentator --start-time "2025-11-19 10:30:00" \
+  --projects "test1,test2" -r BATCH_TESTS
+
+# With custom monitoring intervals
+./batch_test_csv.sh -M -h HOST -u USER -p PASS \
+  -f your_batch.csv -c 70 --hours-ago 2 \
+  -t 30s -T 15m -r BATCH_TESTS -v
+```
+
+**Use cases for Monitor-Only Mode:**
+- You killed the script but want to resume monitoring
+- You want to check on workflows submitted by a previous run
+- You want to generate reports for workflows that were submitted separately
 
 **CSV Format:**
 The CSV file requires these columns (case-sensitive, but order doesn't matter):
