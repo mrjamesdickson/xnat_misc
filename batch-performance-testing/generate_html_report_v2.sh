@@ -217,10 +217,14 @@ cat > "$HTML_FILE" <<'HTMLEOF'
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+            min-height: 400px;
         }
         .chart-wrapper h3 {
             margin-bottom: 15px;
             color: #333;
+        }
+        .chart-wrapper canvas {
+            max-height: 400px;
         }
         table {
             width: 100%;
@@ -386,6 +390,7 @@ cat > "$HTML_FILE" <<'HTMLEOF'
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: true },
                         tooltip: { mode: 'index', intersect: false }
@@ -458,6 +463,7 @@ cat > "$HTML_FILE" <<'HTMLEOF'
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: true },
                         tooltip: { mode: 'index', intersect: false }
