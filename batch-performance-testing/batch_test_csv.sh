@@ -1045,6 +1045,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     LAST_CHANGE_TIME=$(date +%s)
     STUCK_THRESHOLD=600  # 10 minutes in seconds
 
+    # Initialize per-workflow tracking file
+    WORKFLOW_TRACKING_FILE="${LOG_FILE%.log}_workflow_tracking.jsonl"
+    > "$WORKFLOW_TRACKING_FILE"  # Clear file
+
     while true; do
         sleep 10
         CHECK_COUNT=$((CHECK_COUNT + 1))
@@ -1124,6 +1128,19 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
             echo "$BATCH_WORKFLOWS" | jq -r '.[] | select(.status | test("Running|Started|In Progress|Complete|Failed|Killed|Queued|Pending|Finalizing"; "i") | not) | "  - Workflow \(.workflowId // .workflow_id // "N/A"): Status=\"\(.status)\""' 2>/dev/null
         else
             echo "Check $CHECK_COUNT (${ELAPSED_MIN} min): Found $TOTAL_WORKFLOWS workflows - Running: ${RUNNING:-0}, Complete: ${COMPLETE:-0}, Failed: ${FAILED:-0}, Pending: ${PENDING:-0}"
+        fi
+
+        # Track individual workflow state transitions
+        if [ "$TOTAL_WORKFLOWS" -gt 0 ]; then
+            CURRENT_TIME=$(date +%s)
+            echo "$BATCH_WORKFLOWS" | jq -c --argjson check_time "$CURRENT_TIME" '.[] | {
+                workflowId: (.workflowId // .workflow_id),
+                externalId: (.externalId // .external_id),
+                status: .status,
+                launchTime: ((.launchTime // .launch_time // 0) / 1000),
+                checkTime: $check_time,
+                checkNumber: '"$CHECK_COUNT"'
+            }' >> "$WORKFLOW_TRACKING_FILE" 2>/dev/null
         fi
 
         # Show individual workflow details in verbose mode
@@ -1214,6 +1231,83 @@ EOF
                     ;;
             esac
         done
+        echo ""
+    fi
+fi
+
+# Generate per-workflow metrics CSV
+if [ -f "$WORKFLOW_TRACKING_FILE" ] && [ -s "$WORKFLOW_TRACKING_FILE" ]; then
+    WORKFLOW_METRICS_CSV="${LOG_FILE%.log}_workflow_metrics.csv"
+
+    echo ""
+    echo -e "${YELLOW}=== GENERATING PER-WORKFLOW METRICS ===${NC}"
+    echo ""
+
+    # Process tracking data to calculate per-workflow durations
+    cat > /tmp/process_workflows_$$.py << 'PYTHON_SCRIPT'
+import json
+import sys
+from collections import defaultdict
+from datetime import datetime
+
+# Read all workflow state transitions
+workflows = defaultdict(list)
+with open(sys.argv[1], 'r') as f:
+    for line in f:
+        try:
+            data = json.loads(line.strip())
+            wf_id = data['workflowId']
+            workflows[wf_id].append(data)
+        except:
+            continue
+
+# Calculate metrics for each workflow
+print("WorkflowID,ExperimentID,Status,LaunchTime,FirstSeen,LastUpdate,QueuedDuration,RunningDuration,TotalDuration")
+for wf_id, states in workflows.items():
+    # Sort by check time
+    states.sort(key=lambda x: x['checkTime'])
+
+    experiment_id = states[0]['externalId']
+    launch_time = states[0]['launchTime']
+    first_seen = states[0]['checkTime']
+    last_update = states[-1]['checkTime']
+    final_status = states[-1]['status']
+
+    # Find when it transitioned to Running and Complete/Failed
+    running_time = None
+    complete_time = None
+
+    for state in states:
+        status = state['status']
+        check_time = state['checkTime']
+
+        if running_time is None and any(x in status.lower() for x in ['running', 'started']):
+            running_time = check_time
+
+        if complete_time is None and any(x in status.lower() for x in ['complete', 'failed', 'killed']):
+            complete_time = check_time
+            break
+
+    # Calculate durations
+    queued_duration = (running_time - launch_time) if running_time and launch_time else 0
+    running_duration = (complete_time - running_time) if complete_time and running_time else 0
+    total_duration = (complete_time - launch_time) if complete_time and launch_time else 0
+
+    launch_str = datetime.fromtimestamp(launch_time).isoformat() if launch_time else "N/A"
+    first_seen_str = datetime.fromtimestamp(first_seen).isoformat() if first_seen else "N/A"
+    last_update_str = datetime.fromtimestamp(last_update).isoformat() if last_update else "N/A"
+
+    print(f"{wf_id},{experiment_id},{final_status},{launch_str},{first_seen_str},{last_update_str},{queued_duration:.1f},{running_duration:.1f},{total_duration:.1f}")
+PYTHON_SCRIPT
+
+    python3 /tmp/process_workflows_$$.py "$WORKFLOW_TRACKING_FILE" > "$WORKFLOW_METRICS_CSV" 2>/dev/null
+    rm -f /tmp/process_workflows_$$.py
+
+    if [ -f "$WORKFLOW_METRICS_CSV" ] && [ -s "$WORKFLOW_METRICS_CSV" ]; then
+        echo -e "${GREEN}✓ Per-workflow metrics saved to: $WORKFLOW_METRICS_CSV${NC}"
+        echo ""
+        echo "Sample (first 10 workflows):"
+        head -11 "$WORKFLOW_METRICS_CSV" | column -t -s,
         echo ""
     fi
 fi
