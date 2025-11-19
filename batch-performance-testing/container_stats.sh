@@ -16,28 +16,33 @@ NC='\033[0m' # No Color
 # Default values
 DAYS=1
 SHOW_DETAILS=false
+PROJECT_FILTER=""
 
 # Usage
 usage() {
-    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-d <DAYS>] [-v]"
+    echo "Usage: $0 -h <XNAT_HOST> -u <USERNAME> -p <PASSWORD> [-d <DAYS>] [-P <PATTERN>] [-v]"
     echo ""
     echo "  -h  XNAT host (e.g., https://xnat.example.com)"
     echo "  -u  Username"
     echo "  -p  Password"
     echo "  -d  Days of history to include (default: 1)"
+    echo "  -P  Project filter pattern (grep regex, e.g., 'test' or 'ADMIN|CMB')"
     echo "  -v  Verbose mode - show detailed workflow list"
     echo ""
-    echo "Example:"
+    echo "Examples:"
     echo "  $0 -h http://demo02.xnatworks.io -u admin -p admin -d 7"
+    echo "  $0 -h http://demo02.xnatworks.io -u admin -p admin -P 'test'"
+    echo "  $0 -h http://demo02.xnatworks.io -u admin -p admin -P 'ADMIN|CMB' -v"
     exit 1
 }
 
 # Parse arguments
-while getopts "h:u:p:d:v" opt; do
+while getopts "h:u:p:d:P:v" opt; do
     case $opt in
         h) XNAT_HOST="$OPTARG" ;;
         u) USERNAME="$OPTARG" ;;
         p) PASSWORD="$OPTARG" ;;
+        P) PROJECT_FILTER="$OPTARG" ;;
         d) DAYS="$OPTARG" ;;
         v) SHOW_DETAILS=true ;;
         *) usage ;;
@@ -79,6 +84,21 @@ if [ -z "$PROJECTS" ]; then
 fi
 
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -l | tr -d ' ')
+
+# Apply project filter if specified
+if [ -n "$PROJECT_FILTER" ]; then
+    TOTAL_PROJECTS=$PROJECT_COUNT
+    PROJECTS=$(echo "$PROJECTS" | grep -E "$PROJECT_FILTER" || echo "")
+
+    if [ -z "$PROJECTS" ]; then
+        echo -e "${RED}No projects match filter: $PROJECT_FILTER${NC}"
+        exit 1
+    fi
+
+    PROJECT_COUNT=$(echo "$PROJECTS" | wc -l | tr -d ' ')
+    echo -e "${CYAN}Applied filter '$PROJECT_FILTER': ${PROJECT_COUNT} of ${TOTAL_PROJECTS} projects match${NC}"
+fi
+
 echo -e "${GREEN}✓ Found $PROJECT_COUNT project(s)${NC}"
 echo ""
 
