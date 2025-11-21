@@ -121,7 +121,7 @@ echo "$TOKENS" | jq -r '.[] | "\(.id)|\(.alias)"' | while IFS='|' read -r TOKEN_
         if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
             echo "  ✓ Successfully invalidated"
         else
-            BODY=$(echo "$RESPONSE" | head -n -1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
             echo "  ✗ Failed (HTTP $HTTP_CODE)"
             if [[ "$BODY" == *"<h3>"* ]]; then
                 ERROR_MSG=$(echo "$BODY" | grep -o '<h3>.*</h3>' | sed 's/<[^>]*>//g')
