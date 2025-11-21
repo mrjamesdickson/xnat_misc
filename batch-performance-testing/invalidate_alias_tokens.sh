@@ -57,10 +57,16 @@ if [ -z "$ADMIN_PASSWORD" ]; then
     echo ""
 fi
 
+# Create temporary cookie jar
+COOKIE_JAR=$(mktemp)
+trap "rm -f $COOKIE_JAR" EXIT
+
+# Establish session by fetching tokens (first authenticated request with -u to create session)
+echo "Establishing session as $ADMIN_USER..."
 echo "Fetching alias tokens for user: $TARGET_USER"
 
-# Get all alias tokens for the user
-TOKENS=$(curl -s -u "$ADMIN_USER:$ADMIN_PASSWORD" \
+# Get all alias tokens for the user (this creates the session and saves cookie)
+TOKENS=$(curl -s -c "$COOKIE_JAR" -u "$ADMIN_USER:$ADMIN_PASSWORD" \
     -H "Accept: application/json" \
     "$XNAT_URL/data/services/tokens/show")
 
@@ -109,11 +115,11 @@ echo ""
 echo "Proceeding with token invalidation..."
 echo ""
 
-# Delete each token
+# Delete each token (using session cookie)
 echo "$TOKENS" | jq -r '.[] | "\(.id)|\(.alias)"' | while IFS='|' read -r TOKEN_ID ALIAS; do
     if [ -n "$TOKEN_ID" ]; then
         echo "Invalidating token: ${ALIAS:0:24}... (ID: $TOKEN_ID)"
-        RESPONSE=$(curl -s -w "\n%{http_code}" -u "$ADMIN_USER:$ADMIN_PASSWORD" \
+        RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" \
             "$XNAT_URL/data/services/tokens/invalidate/$TOKEN_ID?format=json")
 
         HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
