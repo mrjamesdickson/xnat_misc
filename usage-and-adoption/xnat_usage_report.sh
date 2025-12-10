@@ -12,20 +12,20 @@ set -euo pipefail
 
 # Configuration
 XNAT_URL="${1:-}"
-OUTPUT_FILE="${2:-xnat_usage_report.html}"
-UPLOAD_PROJECT="${3:-}"
+UPLOAD_PROJECT="${2:-}"
+OUTPUT_FILE="${3:-xnat_usage_report.html}"
 USERNAME="${4:-}"
 PASSWORD="${5:-}"
 
 # Check required parameters
-if [[ -z "$XNAT_URL" ]]; then
-    echo "Usage: $0 <XNAT_URL> [OUTPUT_FILE] [UPLOAD_PROJECT] [USERNAME] [PASSWORD]"
+if [[ -z "$XNAT_URL" || -z "$UPLOAD_PROJECT" ]]; then
+    echo "Usage: $0 <XNAT_URL> <UPLOAD_PROJECT> [OUTPUT_FILE] [USERNAME] [PASSWORD]"
     echo ""
-    echo "Example: $0 http://xnat.example.com"
-    echo "Example: $0 http://xnat.example.com report.html RADVAL admin mypass"
+    echo "Example: $0 http://xnat.example.com RADVAL"
+    echo "Example: $0 http://xnat.example.com RADVAL report.html admin mypass"
     echo ""
-    echo "If UPLOAD_PROJECT is specified, the report will be uploaded to"
-    echo "a project-level resource called 'USAGE' in that project."
+    echo "The report will be uploaded to a project-level resource called 'USAGE'"
+    echo "in the specified project."
     echo ""
     echo "USERNAME and PASSWORD will be prompted if not provided."
     exit 1
@@ -1195,11 +1195,9 @@ main() {
     test_connection
     generate_report
 
-    # Upload to project if specified
-    if [[ -n "$UPLOAD_PROJECT" ]]; then
-        echo ""
-        upload_report "$UPLOAD_PROJECT" "$OUTPUT_FILE"
-    fi
+    # Upload to project
+    echo ""
+    upload_report "$UPLOAD_PROJECT" "$OUTPUT_FILE"
 
     echo ""
     log_info "Done! Open ${OUTPUT_FILE} in a browser to view the report."
