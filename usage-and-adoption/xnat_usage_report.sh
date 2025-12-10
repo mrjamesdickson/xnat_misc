@@ -15,12 +15,17 @@ XNAT_URL="${1:-}"
 USERNAME="${2:-}"
 PASSWORD="${3:-}"
 OUTPUT_FILE="${4:-xnat_usage_report.html}"
+UPLOAD_PROJECT="${5:-}"
 
 # Check required parameters
 if [[ -z "$XNAT_URL" ]]; then
-    echo "Usage: $0 <XNAT_URL> <USERNAME> [PASSWORD] [OUTPUT_FILE]"
+    echo "Usage: $0 <XNAT_URL> <USERNAME> [PASSWORD] [OUTPUT_FILE] [UPLOAD_PROJECT]"
     echo ""
     echo "Example: $0 http://xnat.example.com admin"
+    echo "Example: $0 http://xnat.example.com admin mypass report.html RADVAL"
+    echo ""
+    echo "If UPLOAD_PROJECT is specified, the report will be uploaded to"
+    echo "a project-level resource called 'USAGE' in that project."
     exit 1
 fi
 
@@ -1129,6 +1134,39 @@ EOF
     log_info "Report generated: ${OUTPUT_FILE}"
 }
 
+# Upload report to XNAT project resource
+upload_report() {
+    local project="$1"
+    local file="$2"
+    local filename
+    filename=$(basename "$file")
+
+    log_info "Uploading report to project ${project}..."
+
+    # Create USAGE resource if it doesn't exist
+    log_info "  - Creating/updating USAGE resource..."
+    curl -s -u "${USERNAME}:${PASSWORD}" -X PUT \
+        "${XNAT_URL}/data/projects/${project}/resources/USAGE?format=HTML&content=Usage%20Report" \
+        > /dev/null
+
+    # Upload the file
+    log_info "  - Uploading ${filename}..."
+    local response
+    response=$(curl -s -w "%{http_code}" -u "${USERNAME}:${PASSWORD}" -X PUT \
+        "${XNAT_URL}/data/projects/${project}/resources/USAGE/files/${filename}?inbody=true" \
+        --data-binary "@${file}" \
+        -H "Content-Type: text/html")
+
+    local http_code="${response: -3}"
+    if [[ "$http_code" == "200" || "$http_code" == "201" ]]; then
+        log_info "  - Upload successful!"
+        log_info "  - View at: ${XNAT_URL}/data/projects/${project}/resources/USAGE/files/${filename}"
+    else
+        log_error "  - Upload failed (HTTP ${http_code})"
+        return 1
+    fi
+}
+
 # Main
 main() {
     echo ""
@@ -1144,6 +1182,12 @@ main() {
     check_dependencies
     test_connection
     generate_report
+
+    # Upload to project if specified
+    if [[ -n "$UPLOAD_PROJECT" ]]; then
+        echo ""
+        upload_report "$UPLOAD_PROJECT" "$OUTPUT_FILE"
+    fi
 
     echo ""
     log_info "Done! Open ${OUTPUT_FILE} in a browser to view the report."
