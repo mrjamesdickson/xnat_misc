@@ -40,7 +40,10 @@ if [[ -z "$PASSWORD" ]]; then
 fi
 
 # Pause between API calls (seconds) to avoid server overload
-API_PAUSE=1
+API_PAUSE=0.5
+
+# Page size for experiment fetching
+PAGE_SIZE=500
 
 # Remove trailing slash from URL
 XNAT_URL="${XNAT_URL%/}"
@@ -115,10 +118,6 @@ generate_report() {
     local total_projects
     total_projects=$(echo "$projects_json" | jq '.ResultSet.totalRecords | tonumber')
 
-    # Get project IDs for per-project experiment fetching
-    local project_ids
-    project_ids=$(echo "$projects_json" | jq -r '.ResultSet.Result[].ID')
-
     # Get subjects data
     log_info "  - Subject data..."
     local subjects_json
@@ -127,27 +126,39 @@ generate_report() {
     total_subjects=$(echo "$subjects_json" | jq '.ResultSet.totalRecords | tonumber')
 
     # =========================================
-    # FETCH EXPERIMENTS PER PROJECT (to avoid server overload)
+    # FETCH EXPERIMENTS WITH PAGING (to avoid server overload)
     # =========================================
-    log_info "  - Experiment/session data (fetching per project to avoid server overload)..."
+    log_info "  - Experiment/session data (fetching with page size ${PAGE_SIZE})..."
     local experiments_json='{"ResultSet":{"Result":[]}}'
-    local project_count=0
-    local total_project_count
-    total_project_count=$(echo "$project_ids" | wc -l | tr -d ' ')
+    local offset=0
+    local page_count=0
+    local fetched_count=0
+    local total_fetched=0
 
-    while IFS= read -r project_id; do
-        [[ -z "$project_id" ]] && continue
-        project_count=$((project_count + 1))
-        log_info "      Fetching experiments for project ${project_count}/${total_project_count}: ${project_id}..."
+    while true; do
+        page_count=$((page_count + 1))
+        log_info "      Fetching page ${page_count} (offset ${offset}, limit ${PAGE_SIZE})..."
 
-        local project_experiments
-        project_experiments=$(api_get "/data/projects/${project_id}/experiments?format=json&columns=ID,label,project,insert_date,insert_user,xsiType")
+        local page_experiments
+        page_experiments=$(api_get "/data/experiments?format=json&columns=ID,label,project,insert_date,insert_user,xsiType&limit=${PAGE_SIZE}&offset=${offset}")
+
+        # Count results in this page
+        fetched_count=$(echo "$page_experiments" | jq '.ResultSet.Result | length')
+        total_fetched=$((total_fetched + fetched_count))
+        log_info "      Fetched ${fetched_count} experiments (total: ${total_fetched})"
 
         # Merge results
-        experiments_json=$(echo "$experiments_json" "$project_experiments" | jq -s '
+        experiments_json=$(echo "$experiments_json" "$page_experiments" | jq -s '
             {ResultSet: {Result: (.[0].ResultSet.Result + (.[1].ResultSet.Result // []))}}
         ')
-    done <<< "$project_ids"
+
+        # Stop if we got fewer results than page size (last page)
+        if [[ "$fetched_count" -lt "$PAGE_SIZE" ]]; then
+            break
+        fi
+
+        offset=$((offset + PAGE_SIZE))
+    done
 
     local total_experiments
     total_experiments=$(echo "$experiments_json" | jq '.ResultSet.Result | length')
@@ -1174,9 +1185,8 @@ main() {
     echo "  XNAT Usage & Adoption Report Generator"
     echo "=========================================="
     echo ""
-    echo "Note: This report fetches data per-project with ${API_PAUSE}s pauses"
-    echo "      between API calls to avoid server overload."
-    echo "      This may take several minutes for large deployments."
+    echo "Note: This report fetches experiments in pages of ${PAGE_SIZE} with"
+    echo "      ${API_PAUSE}s pauses between API calls to avoid server overload."
     echo ""
 
     check_dependencies
