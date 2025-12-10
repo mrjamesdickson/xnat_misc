@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XNAT Usage Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f6fa;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header .subtitle { opacity: 0.9; font-size: 1.1em; }
+        .header .meta { margin-top: 15px; font-size: 0.9em; opacity: 0.8; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 30px 0; }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 5px 20px rgba(0,0,0,0.12); }
+        .card .number { font-size: 3em; font-weight: bold; color: var(--secondary); }
+        .card .label { color: #7f8c8d; font-size: 0.95em; margin-top: 5px; }
+        .card.users .number { color: var(--secondary); }
+        .card.projects .number { color: var(--success); }
+        .card.subjects .number { color: var(--warning); }
+        .card.sessions .number { color: var(--danger); }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .section h2 {
+            color: var(--primary);
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        .section h3 {
+            color: var(--dark);
+            margin: 20px 0 15px 0;
+            font-size: 1.2em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover { background: #f8f9fa; }
+        tr:nth-child(even) { background: #fafbfc; }
+        tr:nth-child(even):hover { background: #f0f1f2; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-item .value { font-size: 1.8em; font-weight: bold; color: var(--secondary); }
+        .stat-item .label { font-size: 0.85em; color: #7f8c8d; }
+        .chart-container { display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0; }
+        .chart-box { flex: 1; min-width: 300px; }
+        .chart-wrapper { position: relative; height: 300px; margin: 20px 0; }
+        .chart-wrapper.tall { height: 400px; }
+        .table-wrapper { max-height: 500px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        select {
+            padding: 10px 15px;
+            font-size: 1em;
+            border: 2px solid var(--secondary);
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            min-width: 200px;
+        }
+        select:focus { outline: none; border-color: var(--primary); }
+        .user-selector { margin: 20px 0; display: flex; align-items: center; gap: 15px; }
+        .user-selector label { font-weight: 600; color: var(--primary); }
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: repeat(2, 1fr); }
+            .card .number { font-size: 2em; }
+        }
+        @media print {
+            .header { background: var(--primary) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .section { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>XNAT Usage & Adoption Report</h1>
+        <div class="subtitle">http://demo02.xnatworks.io</div>
+        <div class="meta">
+            Generated: 2025-12-10 15:54:56 EST<br>
+            Admin Contact: james@xnatworks.io
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Summary Dashboard -->
+        <div class="dashboard">
+            <div class="card users">
+                <div class="number">200</div>
+                <div class="label">Total Users</div>
+            </div>
+            <div class="card projects">
+                <div class="number">38</div>
+                <div class="label">Projects</div>
+            </div>
+            <div class="card subjects">
+                <div class="number">1854</div>
+                <div class="label">Subjects</div>
+            </div>
+            <div class="card sessions">
+                <div class="number">1835</div>
+                <div class="label">Sessions/Experiments</div>
+            </div>
+        </div>
+
+        <!-- Activity Overview -->
+        <div class="section">
+            <h2>Activity Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">2025-05-06</div>
+                    <div class="label">Go-Live Date (First Upload)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">13</div>
+                    <div class="label">Total Weeks Active</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">141.1</div>
+                    <div class="label">Avg Uploads/Week</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">2</div>
+                    <div class="label">Users with Uploads</div>
+                </div>
+            </div>
+
+            <h3>Weekly Upload Activity (Since Go-Live)</h3>
+            <div class="chart-wrapper tall">
+                <canvas id="weeklyActivityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Monthly Activity -->
+        <div class="section">
+            <h2>Monthly Activity Analysis</h2>
+            <h3>Users & Uploads Per Month</h3>
+            <div class="chart-wrapper tall">
+                <canvas id="monthlyActivityChart"></canvas>
+            </div>
+
+            <h3>Monthly Statistics</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Unique Users Active</th>
+                            <th>Total User-Days Active</th>
+                            <th>Total Uploads</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>2025-05</td><td>1</td><td>6</td><td>1428</td></tr>
+<tr><td>2025-06</td><td>1</td><td>3</td><td>199</td></tr>
+<tr><td>2025-07</td><td>1</td><td>2</td><td>13</td></tr>
+<tr><td>2025-09</td><td>1</td><td>1</td><td>33</td></tr>
+<tr><td>2025-10</td><td>2</td><td>4</td><td>141</td></tr>
+<tr><td>2025-11</td><td>1</td><td>1</td><td>10</td></tr>
+<tr><td>2025-12</td><td>1</td><td>5</td><td>11</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>User Activity Days per Month (First 100)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Month</th>
+                            <th>Days Active</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>admin</td><td>2025-05</td><td>6</td></tr>
+<tr><td>admin</td><td>2025-06</td><td>3</td></tr>
+<tr><td>admin</td><td>2025-07</td><td>2</td></tr>
+<tr><td>admin</td><td>2025-09</td><td>1</td></tr>
+<tr><td>admin</td><td>2025-10</td><td>3</td></tr>
+<tr><td>admin</td><td>2025-11</td><td>1</td></tr>
+<tr><td>admin</td><td>2025-12</td><td>5</td></tr>
+<tr><td>james</td><td>2025-10</td><td>1</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- User Retention -->
+        <div class="section">
+            <h2>User Retention Analysis</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">108</div>
+                    <div class="label">Avg Retention (Days)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">217</div>
+                    <div class="label">Max Retention (Days)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">2</div>
+                    <div class="label">Active Users</div>
+                </div>
+            </div>
+
+            <h3>User Retention (First to Last Activity)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>First Activity</th>
+                            <th>Last Activity</th>
+                            <th>Retention (Days)</th>
+                            <th>Total Uploads</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>admin</td><td>2025-05-06</td><td>2025-12-09</td><td>217</td><td>1807</td></tr>
+<tr><td>james</td><td>2025-10-24</td><td>2025-10-24</td><td>0</td><td>28</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Individual User Activity -->
+        <div class="section">
+            <h2>Individual User Activity Timeline</h2>
+            <div class="user-selector">
+                <label for="userSelect">Select User:</label>
+                <select id="userSelect" onchange="updateUserChart()">
+                    <option value="">-- Select a user --</option>
+                    <option value="admin">admin</option>
+                    <option value="james">james</option>
+                </select>
+            </div>
+            <div class="chart-wrapper tall">
+                <canvas id="userActivityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Activity by User -->
+        <div class="section">
+            <h2>Top Users by Upload Activity</h2>
+            <div class="chart-container">
+                <div class="chart-box">
+                    <div class="chart-wrapper">
+                        <canvas id="topUsersChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <div class="table-wrapper" style="max-height: 300px;">
+                        <table>
+                            <thead>
+                                <tr><th>Username</th><th>Total Uploads</th></tr>
+                            </thead>
+                            <tbody>
+                        <tr><td>admin</td><td>1807</td></tr>
+<tr><td>james</td><td>28</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Statistics -->
+        <div class="section">
+            <h2>User Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">200</div>
+                    <div class="label">Enabled Users</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">0</div>
+                    <div class="label">Disabled Users</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">200</div>
+                    <div class="label">Verified Users</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">3</div>
+                    <div class="label">Users with Login History</div>
+                </div>
+            </div>
+
+            <h3>Login Activity</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">1</div>
+                    <div class="label">Active (24 hours)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">2</div>
+                    <div class="label">Active (7 days)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">2</div>
+                    <div class="label">Active (30 days)</div>
+                </div>
+            </div>
+
+            <h3>Recently Active Users (Top 20)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Last Login</th>
+                            <th>Enabled</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>admin</td><td>Admin Admin</td><td>james@xnatworks.io</td><td>2025-12-10 20:54:03</td><td>Yes</td></tr>
+<tr><td>jupyterhub</td><td>jupyterhub jupyterhub</td><td>jupyterhub@jupyterhub.jupyterhub</td><td>2025-12-03 22:06:39</td><td>Yes</td></tr>
+<tr><td>james</td><td>james james</td><td>james+345@xnatworks.io</td><td>2025-11-05 00:19:48</td><td>Yes</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Session/Experiment Statistics -->
+        <div class="section">
+            <h2>Session Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="value">528</div>
+                    <div class="label">MR Sessions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">1184</div>
+                    <div class="label">CT Sessions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">123</div>
+                    <div class="label">PET Sessions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="value">0</div>
+                    <div class="label">Other Types</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-box">
+                    <h3>Sessions by Type</h3>
+                    <div class="table-wrapper" style="max-height: 300px;">
+                        <table>
+                            <thead>
+                                <tr><th>Session Type</th><th>Count</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>xnat:ctSessionData</td><td>1184</td></tr>
+<tr><td>xnat:mrSessionData</td><td>528</td></tr>
+<tr><td>xnat:petSessionData</td><td>123</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <h3>Sessions by Project (Top 15)</h3>
+                    <div class="table-wrapper" style="max-height: 300px;">
+                        <table>
+                            <thead>
+                                <tr><th>Project</th><th>Sessions</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>MedNIST</td><td>701</td></tr>
+<tr><td>UPENN-GBM</td><td>448</td></tr>
+<tr><td>test2</td><td>134</td></tr>
+<tr><td>Prostate-AEC</td><td>131</td></tr>
+<tr><td>TCIA-CPTAC-SAR_v9</td><td>130</td></tr>
+<tr><td>CMB-LCA_v09</td><td>57</td></tr>
+<tr><td>ANONYMIZATION</td><td>36</td></tr>
+<tr><td>SITE1</td><td>33</td></tr>
+<tr><td>es_florbetapir</td><td>33</td></tr>
+<tr><td>CENTILOID</td><td>32</td></tr>
+<tr><td>TEST_UPLOAD</td><td>32</td></tr>
+<tr><td>TOTALSEGMENTATOR</td><td>18</td></tr>
+<tr><td>CMB-MML</td><td>15</td></tr>
+<tr><td>DQRTEST</td><td>15</td></tr>
+<tr><td>pre_anon_test</td><td>10</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Recent Sessions (Last 20)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Label</th>
+                            <th>Project</th>
+                            <th>Type</th>
+                            <th>Insert Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>test2_20251209_72309740</td><td>test2</td><td>ctSessionData</td><td>2025-12-09 22:56:43.369</td></tr>
+<tr><td>test2_20251209_55572627</td><td>test2</td><td>mrSessionData</td><td>2025-12-09 22:55:13.54</td></tr>
+<tr><td>Prostate-AEC-002</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-07 03:25:04.945</td></tr>
+<tr><td>UPENN-GBM-00006</td><td>ANONYMIZATION</td><td>mrSessionData</td><td>2025-12-06 21:43:13.969</td></tr>
+<tr><td>UPENN-GBM-00006</td><td>TOTALSEGMENTATOR</td><td>mrSessionData</td><td>2025-12-06 00:17:20.09</td></tr>
+<tr><td>Prostate-AEC-124</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-03 18:53:19.158</td></tr>
+<tr><td>Prostate-AEC-132</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-03 18:53:19.113</td></tr>
+<tr><td>Prostate-AEC-054</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-01 18:32:27.003</td></tr>
+<tr><td>Prostate-AEC-113</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-01 16:43:53.597</td></tr>
+<tr><td>Prostate-AEC-019</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-01 16:43:24.635</td></tr>
+<tr><td>Prostate-AEC-047</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-12-01 16:43:24.635</td></tr>
+<tr><td>Prostate-AEC-116</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 21:41:45.846</td></tr>
+<tr><td>Prostate-AEC-031</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 21:41:11.184</td></tr>
+<tr><td>Prostate-AEC-006</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 21:40:41.644</td></tr>
+<tr><td>Prostate-AEC-098</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 15:49:09.909</td></tr>
+<tr><td>Prostate-AEC-105</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 15:48:41.41</td></tr>
+<tr><td>Prostate-AEC-065</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 15:48:41.41</td></tr>
+<tr><td>Prostate-AEC-003</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 12:37:03.049</td></tr>
+<tr><td>Prostate-AEC-123</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 12:36:49.216</td></tr>
+<tr><td>Prostate-AEC-009</td><td>TOTALSEGMENTATOR</td><td>ctSessionData</td><td>2025-11-30 12:36:49.206</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Projects -->
+        <div class="section">
+            <h2>Projects (38)</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>PI</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>AHEP0731</td><td>AHEP0731</td><td> </td><td>...</td></tr>
+<tr><td>ANONYMIZATION</td><td>ANONYMIZATION</td><td> </td><td>...</td></tr>
+<tr><td>ARAR0331</td><td>ARAR0331</td><td> </td><td>...</td></tr>
+<tr><td>AUTOTEST</td><td>AUTOTEST</td><td> </td><td>...</td></tr>
+<tr><td>C4KC_KiTS</td><td>C4KC_KiTS</td><td> </td><td>TCIA Collection: C4KC-KiTS
+
+Modalities: CT, SEG
+Equipment: SIEMENS, Philips, GE MEDICAL SYSTEMS, TOS...</td></tr>
+<tr><td>CENTILOID</td><td>CENTILOID</td><td> </td><td>...</td></tr>
+<tr><td>CMB-AML_TEST</td><td>CMB-AML Test</td><td> </td><td>Test project for manifest CMB-AML_v04_20240828...</td></tr>
+<tr><td>CMB-CRC_TEST</td><td>CMB-CRC Test</td><td> </td><td>Test project for CT series...</td></tr>
+<tr><td>CMB-CRC_DEMO</td><td>CMB-CRC_DEMO</td><td> </td><td>...</td></tr>
+<tr><td>CMB-LCA</td><td>CMB-LCA</td><td> </td><td>...</td></tr>
+<tr><td>CMB-LCA_v09</td><td>CMB-LCA_v09</td><td> </td><td>...</td></tr>
+<tr><td>CPTAC_LUAD</td><td>CPTAC_LUAD</td><td> </td><td>TCIA Collection: CPTAC-LUAD
+
+Modalities: MR, CT, PT
+Equipment: GE MEDICAL SYSTEMS, SIEMENS, Philips,...</td></tr>
+<tr><td>CMB-MML</td><td>Cancer Moonshot Biobank</td><td> </td><td>The Cancer Moonshot Biobank is a National Cancer Institute initiative to support current and future ...</td></tr>
+<tr><td>DQRTEST</td><td>DQRTEST</td><td> </td><td>...</td></tr>
+<tr><td>MedNIST</td><td>MedNIST</td><td> </td><td>...</td></tr>
+<tr><td>Mediastinal-Lymph-Node</td><td>Mediastinal-Lymph-Node</td><td> </td><td>...</td></tr>
+<tr><td>Prostate-AEC</td><td>Prostate-AEC</td><td> </td><td>...</td></tr>
+<tr><td>RADVAL</td><td>RADVAL</td><td> </td><td>...</td></tr>
+<tr><td>SITE1</td><td>SITE1</td><td> </td><td>...</td></tr>
+<tr><td>SITE2</td><td>SITE2</td><td> </td><td>...</td></tr>
+<tr><td>Spine-Mets-CT-SEG_v1</td><td>Spine-Mets-CT-SEG_v1</td><td> </td><td>...</td></tr>
+<tr><td>TCIA</td><td>TCIA</td><td> </td><td>...</td></tr>
+<tr><td>TCIA-CPTAC-LUAD_v12_20230224</td><td>TCIA-CPTAC-LUAD_v12_20230224</td><td> </td><td>...</td></tr>
+<tr><td>TCIA-CPTAC-SAR_v9</td><td>TCIA-CPTAC-SAR_v9</td><td> </td><td>This collection contains subjects from the National Cancer Institute Clinical Proteomic Tumor Analys...</td></tr>
+<tr><td>TESTPROJ</td><td>TESTPROJ</td><td> </td><td>...</td></tr>
+<tr><td>TESTPROJECT</td><td>TESTPROJECT</td><td> </td><td>...</td></tr>
+<tr><td>TEST_UPLOAD</td><td>TEST_UPLOAD</td><td> </td><td>...</td></tr>
+<tr><td>TOTALSEGMENTATOR</td><td>TOTALSEGMENTATOR</td><td> </td><td>...</td></tr>
+<tr><td>UPENN-GBM</td><td>UPENN-GBM</td><td> </td><td>This collection comprises multi-parametric magnetic resonance imaging (mpMRI) scans for de novo Glio...</td></tr>
+<tr><td>anon_test</td><td>anon_test</td><td> </td><td>...</td></tr>
+<tr><td>dicomweb_test</td><td>dicomweb_test</td><td> </td><td>...</td></tr>
+<tr><td>es_florbetapir</td><td>es_florbetapir</td><td> </td><td>...</td></tr>
+<tr><td>pre_anon_test</td><td>pre_anon_test</td><td> </td><td>...</td></tr>
+<tr><td>shared</td><td>shared</td><td> </td><td>...</td></tr>
+<tr><td>test2</td><td>test2</td><td> </td><td>...</td></tr>
+<tr><td>test_dicom_pacs</td><td>test_dicom_pacs</td><td> </td><td>...</td></tr>
+<tr><td>testprojcreate</td><td>testprojcreate</td><td> </td><td>...</td></tr>
+<tr><td>testshare</td><td>testshare</td><td> </td><td>...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- All Users -->
+        <div class="section">
+            <h2>All Users (200)</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Last Login</th>
+                            <th>Enabled</th>
+                            <th>Verified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>admin</td><td>Admin Admin</td><td>james@xnatworks.io</td><td>2025-12-10 20:54:03</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>guest</td><td>XNAT Guest</td><td>james@xnatworks.io</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>james</td><td>james james</td><td>james+345@xnatworks.io</td><td>2025-11-05 00:19:48</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>jamesMember</td><td>sh sdh</td><td>james+2@xnatworks.io</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>jupyterhub</td><td>jupyterhub jupyterhub</td><td>jupyterhub@jupyterhub.jupyterhub</td><td>2025-12-03 22:06:39</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson101</td><td>Test101 User</td><td>mrjamesdickson+101@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson102</td><td>Test102 User</td><td>mrjamesdickson+102@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson103</td><td>Test103 User</td><td>mrjamesdickson+103@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson104</td><td>Test104 User</td><td>mrjamesdickson+104@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson105</td><td>Test105 User</td><td>mrjamesdickson+105@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson106</td><td>Test106 User</td><td>mrjamesdickson+106@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson107</td><td>Test107 User</td><td>mrjamesdickson+107@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson108</td><td>Test108 User</td><td>mrjamesdickson+108@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson109</td><td>Test109 User</td><td>mrjamesdickson+109@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson110</td><td>Test110 User</td><td>mrjamesdickson+110@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson111</td><td>Test111 User</td><td>mrjamesdickson+111@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson112</td><td>Test112 User</td><td>mrjamesdickson+112@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson113</td><td>Test113 User</td><td>mrjamesdickson+113@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson114</td><td>Test114 User</td><td>mrjamesdickson+114@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson115</td><td>Test115 User</td><td>mrjamesdickson+115@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson116</td><td>Test116 User</td><td>mrjamesdickson+116@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson117</td><td>Test117 User</td><td>mrjamesdickson+117@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson118</td><td>Test118 User</td><td>mrjamesdickson+118@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson119</td><td>Test119 User</td><td>mrjamesdickson+119@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson120</td><td>Test120 User</td><td>mrjamesdickson+120@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson121</td><td>Test121 User</td><td>mrjamesdickson+121@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson122</td><td>Test122 User</td><td>mrjamesdickson+122@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson123</td><td>Test123 User</td><td>mrjamesdickson+123@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson124</td><td>Test124 User</td><td>mrjamesdickson+124@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson125</td><td>Test125 User</td><td>mrjamesdickson+125@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson126</td><td>Test126 User</td><td>mrjamesdickson+126@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson127</td><td>Test127 User</td><td>mrjamesdickson+127@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson128</td><td>Test128 User</td><td>mrjamesdickson+128@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson129</td><td>Test129 User</td><td>mrjamesdickson+129@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson130</td><td>Test130 User</td><td>mrjamesdickson+130@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson131</td><td>Test131 User</td><td>mrjamesdickson+131@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson132</td><td>Test132 User</td><td>mrjamesdickson+132@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson133</td><td>Test133 User</td><td>mrjamesdickson+133@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson134</td><td>Test134 User</td><td>mrjamesdickson+134@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson135</td><td>Test135 User</td><td>mrjamesdickson+135@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson136</td><td>Test136 User</td><td>mrjamesdickson+136@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson137</td><td>Test137 User</td><td>mrjamesdickson+137@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson138</td><td>Test138 User</td><td>mrjamesdickson+138@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson139</td><td>Test139 User</td><td>mrjamesdickson+139@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson140</td><td>Test140 User</td><td>mrjamesdickson+140@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson141</td><td>Test141 User</td><td>mrjamesdickson+141@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson142</td><td>Test142 User</td><td>mrjamesdickson+142@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson143</td><td>Test143 User</td><td>mrjamesdickson+143@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson144</td><td>Test144 User</td><td>mrjamesdickson+144@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson145</td><td>Test145 User</td><td>mrjamesdickson+145@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson146</td><td>Test146 User</td><td>mrjamesdickson+146@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson147</td><td>Test147 User</td><td>mrjamesdickson+147@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson148</td><td>Test148 User</td><td>mrjamesdickson+148@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson149</td><td>Test149 User</td><td>mrjamesdickson+149@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson150</td><td>Test150 User</td><td>mrjamesdickson+150@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson151</td><td>Test151 User</td><td>mrjamesdickson+151@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson152</td><td>Test152 User</td><td>mrjamesdickson+152@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson153</td><td>Test153 User</td><td>mrjamesdickson+153@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson154</td><td>Test154 User</td><td>mrjamesdickson+154@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson155</td><td>Test155 User</td><td>mrjamesdickson+155@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson156</td><td>Test156 User</td><td>mrjamesdickson+156@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson157</td><td>Test157 User</td><td>mrjamesdickson+157@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson158</td><td>Test158 User</td><td>mrjamesdickson+158@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson159</td><td>Test159 User</td><td>mrjamesdickson+159@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson160</td><td>Test160 User</td><td>mrjamesdickson+160@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson161</td><td>Test161 User</td><td>mrjamesdickson+161@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson162</td><td>Test162 User</td><td>mrjamesdickson+162@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson163</td><td>Test163 User</td><td>mrjamesdickson+163@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson164</td><td>Test164 User</td><td>mrjamesdickson+164@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson165</td><td>Test165 User</td><td>mrjamesdickson+165@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson166</td><td>Test166 User</td><td>mrjamesdickson+166@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson167</td><td>Test167 User</td><td>mrjamesdickson+167@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson168</td><td>Test168 User</td><td>mrjamesdickson+168@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson169</td><td>Test169 User</td><td>mrjamesdickson+169@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson170</td><td>Test170 User</td><td>mrjamesdickson+170@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson171</td><td>Test171 User</td><td>mrjamesdickson+171@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson172</td><td>Test172 User</td><td>mrjamesdickson+172@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson173</td><td>Test173 User</td><td>mrjamesdickson+173@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson174</td><td>Test174 User</td><td>mrjamesdickson+174@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson175</td><td>Test175 User</td><td>mrjamesdickson+175@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson176</td><td>Test176 User</td><td>mrjamesdickson+176@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson177</td><td>Test177 User</td><td>mrjamesdickson+177@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson178</td><td>Test178 User</td><td>mrjamesdickson+178@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson179</td><td>Test179 User</td><td>mrjamesdickson+179@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson180</td><td>Test180 User</td><td>mrjamesdickson+180@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson181</td><td>Test181 User</td><td>mrjamesdickson+181@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson182</td><td>Test182 User</td><td>mrjamesdickson+182@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson183</td><td>Test183 User</td><td>mrjamesdickson+183@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson184</td><td>Test184 User</td><td>mrjamesdickson+184@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson185</td><td>Test185 User</td><td>mrjamesdickson+185@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson186</td><td>Test186 User</td><td>mrjamesdickson+186@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson187</td><td>Test187 User</td><td>mrjamesdickson+187@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson188</td><td>Test188 User</td><td>mrjamesdickson+188@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson189</td><td>Test189 User</td><td>mrjamesdickson+189@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson190</td><td>Test190 User</td><td>mrjamesdickson+190@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson191</td><td>Test191 User</td><td>mrjamesdickson+191@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson192</td><td>Test192 User</td><td>mrjamesdickson+192@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson193</td><td>Test193 User</td><td>mrjamesdickson+193@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson194</td><td>Test194 User</td><td>mrjamesdickson+194@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson195</td><td>Test195 User</td><td>mrjamesdickson+195@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson196</td><td>Test196 User</td><td>mrjamesdickson+196@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson197</td><td>Test197 User</td><td>mrjamesdickson+197@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson198</td><td>Test198 User</td><td>mrjamesdickson+198@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson199</td><td>Test199 User</td><td>mrjamesdickson+199@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson200</td><td>Test200 User</td><td>mrjamesdickson+200@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson201</td><td>Test201 User</td><td>mrjamesdickson+201@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson202</td><td>Test202 User</td><td>mrjamesdickson+202@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson203</td><td>Test203 User</td><td>mrjamesdickson+203@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson204</td><td>Test204 User</td><td>mrjamesdickson+204@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson205</td><td>Test205 User</td><td>mrjamesdickson+205@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson206</td><td>Test206 User</td><td>mrjamesdickson+206@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson207</td><td>Test207 User</td><td>mrjamesdickson+207@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson208</td><td>Test208 User</td><td>mrjamesdickson+208@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson209</td><td>Test209 User</td><td>mrjamesdickson+209@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson210</td><td>Test210 User</td><td>mrjamesdickson+210@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson211</td><td>Test211 User</td><td>mrjamesdickson+211@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson212</td><td>Test212 User</td><td>mrjamesdickson+212@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson213</td><td>Test213 User</td><td>mrjamesdickson+213@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson214</td><td>Test214 User</td><td>mrjamesdickson+214@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson215</td><td>Test215 User</td><td>mrjamesdickson+215@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson216</td><td>Test216 User</td><td>mrjamesdickson+216@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson217</td><td>Test217 User</td><td>mrjamesdickson+217@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson218</td><td>Test218 User</td><td>mrjamesdickson+218@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson219</td><td>Test219 User</td><td>mrjamesdickson+219@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson220</td><td>Test220 User</td><td>mrjamesdickson+220@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson221</td><td>Test221 User</td><td>mrjamesdickson+221@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson222</td><td>Test222 User</td><td>mrjamesdickson+222@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson223</td><td>Test223 User</td><td>mrjamesdickson+223@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson224</td><td>Test224 User</td><td>mrjamesdickson+224@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson225</td><td>Test225 User</td><td>mrjamesdickson+225@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson226</td><td>Test226 User</td><td>mrjamesdickson+226@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson227</td><td>Test227 User</td><td>mrjamesdickson+227@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson228</td><td>Test228 User</td><td>mrjamesdickson+228@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson229</td><td>Test229 User</td><td>mrjamesdickson+229@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson230</td><td>Test230 User</td><td>mrjamesdickson+230@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson231</td><td>Test231 User</td><td>mrjamesdickson+231@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson232</td><td>Test232 User</td><td>mrjamesdickson+232@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson233</td><td>Test233 User</td><td>mrjamesdickson+233@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson234</td><td>Test234 User</td><td>mrjamesdickson+234@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson235</td><td>Test235 User</td><td>mrjamesdickson+235@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson236</td><td>Test236 User</td><td>mrjamesdickson+236@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson237</td><td>Test237 User</td><td>mrjamesdickson+237@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson238</td><td>Test238 User</td><td>mrjamesdickson+238@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson239</td><td>Test239 User</td><td>mrjamesdickson+239@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson240</td><td>Test240 User</td><td>mrjamesdickson+240@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson241</td><td>Test241 User</td><td>mrjamesdickson+241@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson242</td><td>Test242 User</td><td>mrjamesdickson+242@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson243</td><td>Test243 User</td><td>mrjamesdickson+243@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson244</td><td>Test244 User</td><td>mrjamesdickson+244@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson245</td><td>Test245 User</td><td>mrjamesdickson+245@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson246</td><td>Test246 User</td><td>mrjamesdickson+246@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson247</td><td>Test247 User</td><td>mrjamesdickson+247@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson248</td><td>Test248 User</td><td>mrjamesdickson+248@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson249</td><td>Test249 User</td><td>mrjamesdickson+249@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson250</td><td>Test250 User</td><td>mrjamesdickson+250@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson251</td><td>Test251 User</td><td>mrjamesdickson+251@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson252</td><td>Test252 User</td><td>mrjamesdickson+252@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson253</td><td>Test253 User</td><td>mrjamesdickson+253@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson254</td><td>Test254 User</td><td>mrjamesdickson+254@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson255</td><td>Test255 User</td><td>mrjamesdickson+255@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson256</td><td>Test256 User</td><td>mrjamesdickson+256@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson257</td><td>Test257 User</td><td>mrjamesdickson+257@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson258</td><td>Test258 User</td><td>mrjamesdickson+258@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson259</td><td>Test259 User</td><td>mrjamesdickson+259@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson260</td><td>Test260 User</td><td>mrjamesdickson+260@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson261</td><td>Test261 User</td><td>mrjamesdickson+261@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson262</td><td>Test262 User</td><td>mrjamesdickson+262@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson263</td><td>Test263 User</td><td>mrjamesdickson+263@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson264</td><td>Test264 User</td><td>mrjamesdickson+264@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson265</td><td>Test265 User</td><td>mrjamesdickson+265@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson266</td><td>Test266 User</td><td>mrjamesdickson+266@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson267</td><td>Test267 User</td><td>mrjamesdickson+267@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson268</td><td>Test268 User</td><td>mrjamesdickson+268@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson269</td><td>Test269 User</td><td>mrjamesdickson+269@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson270</td><td>Test270 User</td><td>mrjamesdickson+270@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson271</td><td>Test271 User</td><td>mrjamesdickson+271@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson272</td><td>Test272 User</td><td>mrjamesdickson+272@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson273</td><td>Test273 User</td><td>mrjamesdickson+273@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson274</td><td>Test274 User</td><td>mrjamesdickson+274@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson275</td><td>Test275 User</td><td>mrjamesdickson+275@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson276</td><td>Test276 User</td><td>mrjamesdickson+276@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson277</td><td>Test277 User</td><td>mrjamesdickson+277@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson278</td><td>Test278 User</td><td>mrjamesdickson+278@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson279</td><td>Test279 User</td><td>mrjamesdickson+279@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson280</td><td>Test280 User</td><td>mrjamesdickson+280@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson281</td><td>Test281 User</td><td>mrjamesdickson+281@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson282</td><td>Test282 User</td><td>mrjamesdickson+282@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson283</td><td>Test283 User</td><td>mrjamesdickson+283@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson284</td><td>Test284 User</td><td>mrjamesdickson+284@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson285</td><td>Test285 User</td><td>mrjamesdickson+285@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson286</td><td>Test286 User</td><td>mrjamesdickson+286@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson287</td><td>Test287 User</td><td>mrjamesdickson+287@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson288</td><td>Test288 User</td><td>mrjamesdickson+288@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson289</td><td>Test289 User</td><td>mrjamesdickson+289@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson290</td><td>Test290 User</td><td>mrjamesdickson+290@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson291</td><td>Test291 User</td><td>mrjamesdickson+291@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson292</td><td>Test292 User</td><td>mrjamesdickson+292@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson293</td><td>Test293 User</td><td>mrjamesdickson+293@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>mrjamesdickson294</td><td>Test294 User</td><td>mrjamesdickson+294@gmail.com</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>test123</td><td>test 123</td><td>james+1@xnatworks.io</td><td>Never</td><td>Yes</td><td>Yes</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>XNAT Usage Report | Generated by xnat_usage_report.sh</p>
+        <p>http://demo02.xnatworks.io</p>
+    </div>
+
+    <script>
+        // Weekly Activity Chart Data
+        const weeklyLabels = [
+  "2025-05-01",
+  "2025-05-08",
+  "2025-05-15",
+  "2025-05-22",
+  "2025-05-29",
+  "2025-06-12",
+  "2025-07-03",
+  "2025-07-24",
+  "2025-09-04",
+  "2025-10-02",
+  "2025-10-23",
+  "2025-11-27",
+  "2025-12-04"
+];
+        const weeklyValues = [
+  15,
+  710,
+  701,
+  2,
+  57,
+  142,
+  1,
+  12,
+  33,
+  112,
+  29,
+  16,
+  5
+];
+
+        // Monthly Activity Data
+        const monthlyLabels = [
+  "2025-05",
+  "2025-06",
+  "2025-07",
+  "2025-09",
+  "2025-10",
+  "2025-11",
+  "2025-12"
+];
+        const monthlyUsers = [
+  1,
+  1,
+  1,
+  1,
+  2,
+  1,
+  1
+];
+        const monthlyUploads = [
+  1428,
+  199,
+  13,
+  33,
+  141,
+  10,
+  11
+];
+
+        // User daily activity data
+        const userDailyActivity = [{"user":"admin","activity":[{"date":"2025-05-06","count":15},{"date":"2025-05-08","count":140},{"date":"2025-05-09","count":439},{"date":"2025-05-11","count":131},{"date":"2025-05-20","count":701},{"date":"2025-05-22","count":2},{"date":"2025-06-02","count":57},{"date":"2025-06-12","count":132},{"date":"2025-06-18","count":10},{"date":"2025-07-09","count":1},{"date":"2025-07-30","count":12},{"date":"2025-09-10","count":33},{"date":"2025-10-02","count":48},{"date":"2025-10-03","count":64},{"date":"2025-10-25","count":1},{"date":"2025-11-30","count":10},{"date":"2025-12-01","count":4},{"date":"2025-12-03","count":2},{"date":"2025-12-06","count":2},{"date":"2025-12-07","count":1},{"date":"2025-12-09","count":2}]},{"user":"james","activity":[{"date":"2025-10-24","count":28}]}];
+
+        // User retention data
+        const userRetentionData = [{"user":"admin","first_activity":"2025-05-06 00:37:41.378","last_activity":"2025-12-09 22:56:43.369","total_uploads":1807,"first_ts":1746489600,"last_ts":1765238400,"retention_days":217},{"user":"james","first_activity":"2025-10-24 01:32:40.695","last_activity":"2025-10-24 01:32:57.507","total_uploads":28,"first_ts":1761264000,"last_ts":1761264000,"retention_days":0}];
+
+        // Weekly Activity Chart
+        const weeklyCtx = document.getElementById('weeklyActivityChart').getContext('2d');
+        new Chart(weeklyCtx, {
+            type: 'bar',
+            data: {
+                labels: weeklyLabels,
+                datasets: [{
+                    label: 'Uploads per Week',
+                    data: weeklyValues,
+                    backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Weekly Upload Activity Since Go-Live'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Week Starting' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Number of Uploads' }
+                    }
+                }
+            }
+        });
+
+        // Monthly Activity Chart
+        const monthlyCtx = document.getElementById('monthlyActivityChart').getContext('2d');
+        new Chart(monthlyCtx, {
+            type: 'bar',
+            data: {
+                labels: monthlyLabels,
+                datasets: [
+                    {
+                        label: 'Unique Users Active',
+                        data: monthlyUsers,
+                        backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Total Uploads',
+                        data: monthlyUploads,
+                        backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                        borderColor: 'rgba(155, 89, 182, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Monthly Activity: Users & Uploads'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Month' }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Unique Users' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Uploads' },
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+
+        // Top Users Chart
+        const topUsersCtx = document.getElementById('topUsersChart').getContext('2d');
+        new Chart(topUsersCtx, {
+            type: 'bar',
+            data: {
+                labels: userRetentionData.slice(0, 10).map(u => u.user),
+                datasets: [{
+                    label: 'Total Uploads',
+                    data: userRetentionData.slice(0, 10).map(u => u.total_uploads),
+                    backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                    borderColor: 'rgba(46, 204, 113, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Top 10 Users by Upload Activity'
+                    }
+                }
+            }
+        });
+
+        // User Activity Chart (individual)
+        let userChart = null;
+
+        function updateUserChart() {
+            const selectedUser = document.getElementById('userSelect').value;
+            const canvas = document.getElementById('userActivityChart');
+            const ctx = canvas.getContext('2d');
+
+            if (userChart) {
+                userChart.destroy();
+            }
+
+            if (!selectedUser) {
+                return;
+            }
+
+            const userData = userDailyActivity.find(u => u.user === selectedUser);
+            if (!userData) {
+                return;
+            }
+
+            const sortedActivity = userData.activity.sort((a, b) => a.date.localeCompare(b.date));
+
+            userChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedActivity.map(a => a.date),
+                    datasets: [{
+                        label: 'Uploads by ' + selectedUser,
+                        data: sortedActivity.map(a => a.count),
+                        backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                        borderColor: 'rgba(155, 89, 182, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Daily Upload Activity for ' + selectedUser
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Date' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Uploads' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
