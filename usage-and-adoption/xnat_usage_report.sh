@@ -11,10 +11,22 @@
 set -euo pipefail
 
 # Configuration
-XNAT_URL="${1:-http://demo02.xnatworks.io}"
-USERNAME="${2:-admin}"
+XNAT_URL="${1:-}"
+USERNAME="${2:-}"
 PASSWORD="${3:-}"
 OUTPUT_FILE="${4:-xnat_usage_report.html}"
+
+# Check required parameters
+if [[ -z "$XNAT_URL" ]]; then
+    echo "Usage: $0 <XNAT_URL> <USERNAME> [PASSWORD] [OUTPUT_FILE]"
+    echo ""
+    echo "Example: $0 http://xnat.example.com admin"
+    exit 1
+fi
+
+if [[ -z "$USERNAME" ]]; then
+    read -p "Enter username: " USERNAME
+fi
 
 # Prompt for password if not supplied
 if [[ -z "$PASSWORD" ]]; then
