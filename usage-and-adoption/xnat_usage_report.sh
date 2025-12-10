@@ -12,20 +12,22 @@ set -euo pipefail
 
 # Configuration
 XNAT_URL="${1:-}"
-USERNAME="${2:-}"
-PASSWORD="${3:-}"
-OUTPUT_FILE="${4:-xnat_usage_report.html}"
-UPLOAD_PROJECT="${5:-}"
+OUTPUT_FILE="${2:-xnat_usage_report.html}"
+UPLOAD_PROJECT="${3:-}"
+USERNAME="${4:-}"
+PASSWORD="${5:-}"
 
 # Check required parameters
 if [[ -z "$XNAT_URL" ]]; then
-    echo "Usage: $0 <XNAT_URL> <USERNAME> [PASSWORD] [OUTPUT_FILE] [UPLOAD_PROJECT]"
+    echo "Usage: $0 <XNAT_URL> [OUTPUT_FILE] [UPLOAD_PROJECT] [USERNAME] [PASSWORD]"
     echo ""
-    echo "Example: $0 http://xnat.example.com admin"
-    echo "Example: $0 http://xnat.example.com admin mypass report.html RADVAL"
+    echo "Example: $0 http://xnat.example.com"
+    echo "Example: $0 http://xnat.example.com report.html RADVAL admin mypass"
     echo ""
     echo "If UPLOAD_PROJECT is specified, the report will be uploaded to"
     echo "a project-level resource called 'USAGE' in that project."
+    echo ""
+    echo "USERNAME and PASSWORD will be prompted if not provided."
     exit 1
 fi
 
