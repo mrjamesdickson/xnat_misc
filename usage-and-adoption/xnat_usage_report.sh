@@ -13,8 +13,14 @@ set -euo pipefail
 # Configuration
 XNAT_URL="${1:-http://demo02.xnatworks.io}"
 USERNAME="${2:-admin}"
-PASSWORD="${3:-admin}"
+PASSWORD="${3:-}"
 OUTPUT_FILE="${4:-xnat_usage_report.html}"
+
+# Prompt for password if not supplied
+if [[ -z "$PASSWORD" ]]; then
+    read -s -p "Enter password for ${USERNAME}@${XNAT_URL}: " PASSWORD
+    echo ""
+fi
 
 # Pause between API calls (seconds) to avoid server overload
 API_PAUSE=1
