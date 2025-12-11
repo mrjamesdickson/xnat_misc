@@ -8,7 +8,7 @@
 # Example: ./xnat_usage_report.sh http://demo02.xnatworks.io admin admin report.html
 #
 
-set -euo pipefail
+set -uo pipefail
 
 # Configuration
 XNAT_URL="${1:-}"
@@ -55,6 +55,9 @@ NC='\033[0m' # No Color
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Error handling - show which step failed
+trap 'log_error "Script failed at line $LINENO (last command: $BASH_COMMAND)"' ERR
 
 # Check dependencies
 check_dependencies() {
