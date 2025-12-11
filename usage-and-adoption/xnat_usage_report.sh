@@ -41,7 +41,7 @@ fi
 API_PAUSE=0.5
 
 # Page size for experiment fetching
-PAGE_SIZE=500
+PAGE_SIZE=10000
 
 # Remove trailing slash from URL
 XNAT_URL="${XNAT_URL%/}"
